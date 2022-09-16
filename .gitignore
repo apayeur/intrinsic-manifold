@@ -1,0 +1,15 @@
+# folders
+results/
+data/
+feulner-clopath/
+.idea/
+__pycache__/
+deprecated/
+
+*.xml
+*.ipynb
+*.pyc
+
+
+# DS_Store
+.DS_Store
