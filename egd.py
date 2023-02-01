@@ -2,9 +2,10 @@ from toy_model import ToyNetwork
 import numpy as np
 import copy
 import os
+from scipy.linalg import subspace_angles
 
 def main():
-    tag = "final_low_lr"  # identification of this experiment, for bookkeeping
+    tag = "final_more_seeds"  # identification of this experiment, for bookkeeping
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -20,10 +21,10 @@ def main():
     lr = 1e-3
     lr_init = (0, lr, 0)
     lr_decoder = (0, lr, 0)
-    lr_adapt = (0, lr/30, 0)  # was lr/15
+    lr_adapt = (0, lr/15, 0)  # was lr/15
     nb_iter = int(1e3)
-    nb_iter_adapt = int(10e3)  # was 5e3
-    seeds = np.arange(20, dtype=int)
+    nb_iter_adapt = int(5e3)  # was 5e3
+    seeds = np.arange(25, dtype=int)
     relearn_after_decoder_fitting = False
 
     # Total losses
@@ -56,6 +57,10 @@ def main():
                          'UpperVar_vs_VarBCI': np.empty(shape=(len(seeds), nb_iter_adapt))}
                   }
     max_angles = copy.deepcopy(min_angles)
+
+    # Angles between V_OM and V_0 and between V_WM and V_0
+    output_matrix_angles = {'WM': np.empty(shape=(len(seeds), size[2])),
+                            'OM': np.empty(shape=(len(seeds), size[2]))}
 
     # Norm of grad W
     norm_gradW = {'loss':{'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
@@ -104,7 +109,7 @@ def main():
         net1.network_name = 'fitted'
         if seed_id == 0:
             net1.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting.png")
-
+        V_0 = copy.deepcopy(net1.V)
 
         print('\n|-------------------------------- Re-training with decoder --------------------------------|')
         net2 = copy.deepcopy(net1)
@@ -126,6 +131,8 @@ def main():
         net_wm = copy.deepcopy(net2)
         net_wm.network_name = 'wm'
         net_wm.V = net_wm.D @ net_wm.C[selected_wm, :]
+        output_matrix_angles['WM'][seed_id] = np.rad2deg(subspace_angles(V_0.T, net_wm.V.T))
+
         if seed_id == 0:
             net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.png")
 
@@ -156,6 +163,7 @@ def main():
         net_om = copy.deepcopy(net2)
         net_om.network_name = 'om'
         net_om.V = net_om.D @ net_om.C[:, selected_om]
+        output_matrix_angles['OM'][seed_id] = np.rad2deg(subspace_angles(V_0.T, net_om.V.T))
 
         if seed_id == 0:
             net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.png")
@@ -178,6 +186,7 @@ def main():
         for key in min_angles['OM'].keys():
             min_angles['OM'][key][seed_id] = a_min[key]
             max_angles['OM'][key][seed_id] = a_max[key]
+
 
     # Save parameters
     param_dict = {'size': size,
@@ -209,7 +218,15 @@ def main():
     # Save principal angles
     np.save(f"{save_dir}/principal_angles_min", min_angles)
     np.save(f"{save_dir}/principal_angles_max", max_angles)
-
+    np.save(f"{save_dir}/output_matrix_angles", output_matrix_angles)
+    print("Min angle WM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['WM'][:,1]),
+                                                  np.std(output_matrix_angles['WM'][:,1], ddof=1)/len(seeds)**0.5))
+    print("Max angle WM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['WM'][:, 0]),
+                                                  np.std(output_matrix_angles['WM'][:, 0], ddof=1) / len(seeds) ** 0.5))
+    print("Min angle OM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['OM'][:, 1]),
+                                                  np.std(output_matrix_angles['OM'][:, 1], ddof=1) / len(seeds) ** 0.5))
+    print("Max angle OM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['OM'][:, 0]),
+                                                  np.std(output_matrix_angles['OM'][:, 0], ddof=1) / len(seeds) ** 0.5))
     # Save normalized variance explained
     np.save(f"{save_dir}/normalized_variance_explained", normalized_variance_explained)
 

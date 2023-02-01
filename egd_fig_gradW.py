@@ -4,8 +4,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final_low_lr"
-save_fig_dir = "results/egd/final_low_lr"
+load_dir = "data/egd-high-dim-input/plasticity-in-W-only2"
+save_fig_dir = "results/egd-high-dim-input/plasticity-in-W-only2"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 

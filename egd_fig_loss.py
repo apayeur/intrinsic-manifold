@@ -4,8 +4,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final_low_lr"
-save_fig_dir = "results/egd/final_low_lr"
+load_dir = "data/egd-high-dim-input/plasticity-in-W-test"
+save_fig_dir = "results/egd-high-dim-input/plasticity-in-W-test"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -22,6 +22,7 @@ params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
 nb_iter = params['nb_iter']
 nb_iter_adapt = params['nb_iter_adapt']
 
+x_label = 'Weight update post-perturbation' if 'egd' in load_dir else 'Epoch'
 
 # ------------------------ Loss-related figures ------------------------ #
 # Plot initial loss
@@ -39,7 +40,7 @@ plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
 for i in range(loss['WM'].shape[0]):
     line_, = plt.semilogy(loss['WM'][i], label='WM' if i == 0 else None, lw=0.5)
     plt.semilogy(loss['OM'][i], '--', label='OM' if i == 0 else None, color=line_.get_color(), lw=0.5)
-plt.xlabel('Weight update post-perturbation')
+plt.xlabel(x_label)
 plt.ylabel('Loss')
 plt.legend()
 plt.tight_layout()
@@ -60,7 +61,8 @@ plt.fill_between(np.arange(m_om.shape[0]),
                  m_om - 2*std_om/loss['OM'].shape[0]**0.5,
                  m_om + 2*std_om/loss['OM'].shape[0]**0.5,
                  color=col_o, lw=0, alpha=0.5)
-plt.xlabel('Weight update post-perturbation')
+plt.ylim([0,0.5])
+plt.xlabel(x_label)
 plt.ylabel('Loss')
 plt.legend()
 plt.tight_layout()
@@ -82,7 +84,7 @@ for i in range(loss['WM'].shape[0]):
              'x-', markersize=3, markeredgewidth=0.5, label='OM' if i == 0 else None,
              color=line_.get_color(), lw=0., alpha=0.5)
 plt.yticks([0, 1])
-plt.xlabel('Weight update post-perturbation')
+plt.xlabel(x_label)
 plt.ylabel('Retraining performance')
 plt.legend()
 plt.tight_layout()
@@ -103,7 +105,7 @@ for perturbation_type in ['WM', 'OM']:
                  color=col_w if perturbation_type == 'WM' else col_o,
                  markersize=3, markeredgewidth=0, label=perturbation_type, lw=0.5)
 plt.yticks([0, 1])
-plt.xlabel('Weight update post-perturbation')
+plt.xlabel(x_label)
 plt.ylabel('Retraining performance')
 plt.legend()
 plt.tight_layout()
@@ -132,8 +134,8 @@ for perturbation_type in ['WM', 'OM']:
                         color=col_w if perturbation_type=='WM' else col_o, alpha=0.5, lw=0)
 ax_var.set_ylabel('Variance component\nof the loss')
 ax_exp.set_ylabel('Expectation component\nof the loss')
-#ax_var.set_xlabel('Weight update post-perturbation')
-ax_exp.set_xlabel('Weight update post-perturbation')
+#ax_var.set_xlabel(x_label)
+ax_exp.set_xlabel(x_label)
 ax_var.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/LossComponents.png')
@@ -161,8 +163,8 @@ for perturbation_type in ['WM', 'OM']:
                         color=col_w if perturbation_type=='WM' else col_o, alpha=0.5, lw=0)
 ax_var.set_ylabel('Correlation component\nof the loss')
 ax_exp.set_ylabel('Projection component\nof the loss')
-#ax_var.set_xlabel('Weight update post-perturbation')
-ax_exp.set_xlabel('Weight update post-perturbation')
+#ax_var.set_xlabel(x_label)
+ax_exp.set_xlabel(x_label)
 ax_var.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/LossComponentsCorrProj.png')
@@ -185,7 +187,7 @@ plt.fill_between(np.arange(m_om.shape[0]),
                  m_om + 2*std_om/ratio['OM'].shape[0]**0.5,
                  color=col_o, lw=0, alpha=0.5)
 
-plt.xlabel('Weight update post-perturbation')
+plt.xlabel(x_label)
 plt.ylabel(r'$\frac{1}{2}\|\|V \bar{\mathbf{v}} \|  \|^2$')
 plt.legend()
 plt.tight_layout()
@@ -210,7 +212,7 @@ plt.fill_between(np.arange(m_om.shape[0]),
                  m_om + 2*std_om/loss['OM'].shape[0]**0.5,
                  color=col_o, lw=0, alpha=0.5)
 
-plt.xlabel('Weight update post-perturbation')
+plt.xlabel(x_label)
 plt.ylabel(r'$\frac{1}{2}$tr$\{V \mathbb{V}[\bar{\mathbf{v}}] V^\mathsf{T}\}$')
 plt.legend()
 plt.tight_layout()

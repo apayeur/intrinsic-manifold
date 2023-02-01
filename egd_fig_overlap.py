@@ -9,8 +9,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final_low_lr"
-save_fig_dir = "results/egd/final_low_lr"
+load_dir = "data/egd/final_more_seeds"
+save_fig_dir = "results/egd/final_more_seeds"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -39,8 +39,8 @@ R = np.load(f"{load_dir}/R.npy")
 plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
 m = np.mean(R, axis=0)
 sem = np.std(R, axis=0, ddof=1) / R.shape[0]**0.5
-plt.plot(np.arange(len(m)), m, 'k')
-plt.fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem, color='k', alpha=0.25, lw=0)
+plt.plot(np.arange(len(m)), m, color=col_o)
+plt.fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem, color=col_o, alpha=0.5, lw=0)
 plt.xlabel('Weight update post-perturbation')
 plt.ylabel('Ratio of projected variance, $R$')
 plt.tight_layout()

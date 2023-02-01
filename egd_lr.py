@@ -9,7 +9,7 @@ import copy
 import os
 
 def main():
-    tag = "effect-of-lr"  # identification of this experiment, for bookkeeping
+    tag = "effect-of-lr2"  # identification of this experiment, for bookkeeping
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -26,10 +26,10 @@ def main():
     lr_init = (0, lr, 0)
     lr_decoder = (0, lr, 0)
 
-    lr_adapts = [lr, lr/10, lr/25]
+    lr_adapts = [lr/10, lr/2]  # , lr/25]
 
     nb_iter = int(1e3)
-    seeds = np.arange(3, dtype=int)
+    seeds = np.arange(25, dtype=int)
     relearn_after_decoder_fitting = False
 
     # Total losses
@@ -54,7 +54,7 @@ def main():
                               initialization_type='random',
                               rng_seed=seed)
             l, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
-            loss_init[seed_id] = l['total']
+            loss_init[lr_i][seed_id] = l['total']
             if seed_id == 0:
                 net0.plot_sample(sample_size=1000,
                                  outfile_name=f"{save_dir_results}/SampleEndInitialTraining_lr{learning_rate}.png")

@@ -9,8 +9,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final_low_lr"
-save_fig_dir = "results/egd/final_low_lr"
+load_dir = "data/egd-high-dim-input/plasticity-in-U-only-lower-lr"
+save_fig_dir = "results/egd-high-dim-input/plasticity-in-U-only-lower-lr"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -50,6 +50,8 @@ for projection_type in ['D', 'DP_WM']:
 axes[1].set_xlabel('Weight update post-perturbation')
 axes[0].set_ylabel('Change in decoder-projected\ncovariability (%)')
 axes[1].set_ylabel('Change in decoder-projected\ncovariability (%)')
+axes[0].set_ylim(ymax=1600)
+axes[1].set_ylim(ymax=1600)
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/Strategies.png')
 plt.close()

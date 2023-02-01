@@ -4,9 +4,9 @@ import copy
 import os
 
 def main():
-    tag = "plasticity-in-W-test2"  # identification of this experiment, for bookkeeping
-    save_dir = f"data/egd-high-dim-input/{tag}"
-    save_dir_results = f"results/egd-high-dim-input/{tag}"
+    tag = "test2"  # identification of this experiment, for bookkeeping
+    save_dir = f"data/np-high-dim-input/{tag}"
+    save_dir_results = f"results/np-high-dim-input/{tag}"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     if not os.path.exists(save_dir_results):
@@ -19,13 +19,13 @@ def main():
     nb_inputs = 6
     intrinsic_manifold_dim = 10  # 6
     input_subspace_dim = size[0]//10
-    lr = 5e-3  # was 10e-3
+    lr = 10e-3
     lr_init = (lr, lr, 0)
     lr_decoder = (lr, lr, 0)
-    lr_adapt = (0, 5.e-3, 0)  # was lr/15 (4*lr, 0, 0)
-    nb_iter = int(7e3)
-    nb_iter_adapt = int(1e3)  # was 5e3
-    seeds = np.arange(20, dtype=int)
+    lr_adapt = (lr, 0, 0)  # was lr/15
+    nb_iter = int(1e3)
+    nb_iter_adapt = int(5e3)  # was 5e3
+    seeds = np.arange(1, dtype=int)
     relearn_after_decoder_fitting = False
 
     # Total losses
@@ -63,7 +63,7 @@ def main():
     norm_gradW = {'loss':{'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
                           'OM': np.empty(shape=(len(seeds), nb_iter_adapt))},
                   'loss_tot_var': {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                               'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}}
+                                   'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}}
 
 
 
@@ -112,7 +112,7 @@ def main():
         net2 = copy.deepcopy(net1)
         net2.network_name = 'retrained_after_fitted'
         if relearn_after_decoder_fitting:
-            loss_decoder_retraining, _, _, _, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+            loss_decoder_retraining, _, _, _, _, _, _ = net2.train_with_node_perturbation(lr=lr_decoder, nb_iter=nb_iter//10)
             if seed_id == 0:
                 net2.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.png")
 
@@ -131,7 +131,7 @@ def main():
         if seed_id == 0:
             net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.png")
 
-        l, norm, a_min, a_max, nve, _, A_tmp = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+        l, norm, a_min, a_max, nve, _, A_tmp = net_wm.train_with_node_perturbation(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
         if seed_id == 0:
             net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.png")
@@ -162,7 +162,7 @@ def main():
         if seed_id == 0:
             net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.png")
 
-        l, norm, a_min, a_max, nve, R_seed, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+        l, norm, a_min, a_max, nve, R_seed, _ = net_om.train_with_node_perturbation(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
         if seed_id == 0:
             net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.png")
