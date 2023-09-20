@@ -11,8 +11,8 @@ import os
 from utils import units_convert, col_o, col_w
 plt.style.use('rnn4bci_plot_params.dms')
 
-def main():
-    tag = "incremental-training"  # identification of this experiment, for bookkeeping
+def main(do_incremental_training):
+    tag = "incremental-training-no-partial-increment"  # identification of this experiment, for bookkeeping
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -21,7 +21,6 @@ def main():
         os.makedirs(save_dir_results)
 
     # Parameters
-    do_incremental_training = True
     size = (6, 100, 2)
     input_noise_intensity = 0e-4
     private_noise_intensity = 1e-3
@@ -91,7 +90,7 @@ def main():
         V_OM = copy.copy(net_om.D @ net_om.C[:, selected_om])
 
         if do_incremental_training:
-            as_ = [1, 2, 3, 4, 4.5, 5]
+            as_ = [1, 2, 3, 4, 5]  # DEBUG [1, 2, 3, 4, 4.5, 5]
             concat_total_loss = []
             for a in as_:
                 net_om.V = (1 - a/max(as_)) * V_intrinsic + a/max(as_) * V_OM
@@ -147,4 +146,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(True)
+    main(False)

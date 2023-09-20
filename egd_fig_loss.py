@@ -4,8 +4,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd-high-dim-input/plasticity-in-W-test"
-save_fig_dir = "results/egd-high-dim-input/plasticity-in-W-test"
+load_dir = "data/egd-high-dim-input/plasticity-in-U-only-final-M6-matching-params"
+save_fig_dir = "results/egd-high-dim-input/plasticity-in-U-only-final-M6-matching-params"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -61,7 +61,8 @@ plt.fill_between(np.arange(m_om.shape[0]),
                  m_om - 2*std_om/loss['OM'].shape[0]**0.5,
                  m_om + 2*std_om/loss['OM'].shape[0]**0.5,
                  color=col_o, lw=0, alpha=0.5)
-plt.ylim([0,0.5])
+#plt.ylim([0,0.5])
+#plt.xlim([0,4000])
 plt.xlabel(x_label)
 plt.ylabel('Loss')
 plt.legend()
@@ -142,7 +143,9 @@ plt.savefig(f'{save_fig_dir}/LossComponents.png')
 plt.close()
 
 # Plot loss components correlation and projection
-fig, (ax_var, ax_exp) = plt.subplots(nrows=2, figsize=(45*units_convert['mm'], 2*45*units_convert['mm']/1.5), sharex=True)
+fig_var, ax_var = plt.subplots(nrows=1, figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
+fig_exp, ax_exp = plt.subplots(nrows=1, figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
+
 for perturbation_type in ['WM', 'OM']:
     mean_ = np.mean(loss_corr[perturbation_type], axis=0)
     std_ = np.std(loss_corr[perturbation_type], axis=0, ddof=1)
@@ -152,6 +155,7 @@ for perturbation_type in ['WM', 'OM']:
                         mean_ - 2*std_/loss_var[perturbation_type].shape[0]**0.5,
                         mean_ + 2 * std_ / loss_var[perturbation_type].shape[0] ** 0.5,
                         color=col_w if perturbation_type=='WM' else col_o, alpha=0.5, lw=0)
+ax_var.plot(np.arange(len(mean_)), 0.5 * np.ones(len(mean_)), ':', lw=0.5, color='grey')
 for perturbation_type in ['WM', 'OM']:
     mean_ = np.mean(loss_proj[perturbation_type], axis=0)
     std_ = np.std(loss_proj[perturbation_type], axis=0, ddof=1)
@@ -163,11 +167,13 @@ for perturbation_type in ['WM', 'OM']:
                         color=col_w if perturbation_type=='WM' else col_o, alpha=0.5, lw=0)
 ax_var.set_ylabel('Correlation component\nof the loss')
 ax_exp.set_ylabel('Projection component\nof the loss')
-#ax_var.set_xlabel(x_label)
+ax_var.set_xlabel(x_label)
 ax_exp.set_xlabel(x_label)
 ax_var.legend()
-plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/LossComponentsCorrProj.png')
+fig_var.tight_layout()
+fig_exp.tight_layout()
+fig_var.savefig(f'{save_fig_dir}/LossComponentsCorr.png')
+fig_exp.savefig(f'{save_fig_dir}/LossComponentsProj.png')
 plt.close()
 
 # Plot total-covariance loss component vs vbar-related loss component

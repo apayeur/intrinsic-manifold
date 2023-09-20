@@ -4,7 +4,6 @@ from utils import target_colors, gram_schmidt, principal_angles, units_convert
 from random_vector import MultivariateNormal, GaussianMixture
 plt.style.use('rnn4bci_plot_params.dms')
 import sklearn.linear_model as lm
-import os
 from numba import njit
 from numba.typed import List as nbList
 import copy
@@ -71,7 +70,8 @@ class ToyNetwork:
     """
     def __init__(self, network_name, size=(100,50,2), nb_inputs=8, private_noise_intensity=1e-3,
                  input_noise_intensity=1e-2, input_subspace_dim=100, initialization_type='random',
-                 global_mean_input_is_zero=True, use_data_for_decoding=False, rng_seed=1, sparsity_factor=1):
+                 global_mean_input_is_zero=True, use_data_for_decoding=False, orthogonalize_input_means=True,
+                 rng_seed=1, sparsity_factor=1):
         self.size = size
         self.input_size, self.network_size, self.output_size = size
         self.nb_inputs = nb_inputs
@@ -85,6 +85,7 @@ class ToyNetwork:
         self.sample_mean_v = np.empty(shape=self.network_size)
         self.rng = np.random.default_rng(rng_seed)
         self.sparsity_factor = sparsity_factor
+        self.orthogonalize_input_means = orthogonalize_input_means
         self.P = None  # inverse correlation matrix
 
         # BCI decoder attributes
@@ -148,7 +149,9 @@ class ToyNetwork:
                 global_mean = np.mean(means, axis=0)
                 means = [means[i] - global_mean for i in range(self.nb_inputs)]
             means = [means[i] / np.linalg.norm(means[i]) for i in range(self.nb_inputs)]
-            means = gram_schmidt(means)
+
+            if self.orthogonalize_input_means:
+                means = gram_schmidt(means)
             # Covariances
             if self.input_subspace_dim == self.input_size:
                 covs = [self.input_noise_intensity * np.eye(self.input_size)] * self.nb_inputs
@@ -164,7 +167,9 @@ class ToyNetwork:
             if self.nb_inputs == self.input_size and self.input_noise_intensity < 1e-6:
                 U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
             else:
-                U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.network_size ** 0.5
+                U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size ** 0.5
+            # DEGUG!!!!!!!!!
+            #W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** 0.5
             W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** 0.5
         elif type_ == 'W-zero':
             U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size ** 0.5
@@ -388,20 +393,18 @@ class ToyNetwork:
                 norm_gradW['loss_tot_var'].append(np.linalg.norm(self.compute_gradient_component('loss_tot_var')))
 
                 # Compute angles
-                dVar = self.compute_dVar(lr[1] * gW * self.mask)
+                dVar = self.compute_dVar(-lr[1] * gW * self.mask, -lr[0] * gU)
                 Var = self.compute_total_covariance()
                 U_Var, _, VT_Var = np.linalg.svd(Var)
                 upper_var = U_Var[:, :d]
                 lower_var = U_Var[:, d:]
 
-                if lr[1] > 0:
-                    max_angles['dVar_vs_VT'][i] = np.rad2deg(subspace_angles(dVar, self.V.T)[0])
+                max_angles['dVar_vs_VT'][i] = np.rad2deg(subspace_angles(dVar, self.V.T)[0])
                 max_angles['UpperVar_vs_VT'][i] = np.rad2deg(subspace_angles(upper_var, self.V.T)[0])
                 max_angles['LowerVar_vs_VT'][i] = np.rad2deg(subspace_angles(lower_var, self.V.T)[0])
                 max_angles['UpperVar_vs_VarBCI'][i] = np.rad2deg(subspace_angles(upper_var, self.C.T)[0])
 
-                if lr[1] > 0:
-                    min_angles['dVar_vs_VT'][i] = np.rad2deg(subspace_angles(dVar, self.V.T)[-1])
+                min_angles['dVar_vs_VT'][i] = np.rad2deg(subspace_angles(dVar, self.V.T)[-1])
                 min_angles['UpperVar_vs_VT'][i] = np.rad2deg(subspace_angles(upper_var, self.V.T)[-1])
                 min_angles['LowerVar_vs_VT'][i] = np.rad2deg(subspace_angles(lower_var, self.V.T)[-1])
                 min_angles['UpperVar_vs_VarBCI'][i] = np.rad2deg(subspace_angles(upper_var, self.C.T)[-1])
@@ -512,7 +515,7 @@ class ToyNetwork:
         if stopping_crit is not None:
             nb_iter = 0
         else:
-            stopping_crit = 0.
+            stopping_crit = 1e6
 
         # Learning
         i = 0
@@ -529,7 +532,7 @@ class ToyNetwork:
             losses['vbar'].append(0.5*np.linalg.norm(self.V @ self.get_mean_activity())**2)
             loss = loss_var + loss_exp
 
-            if stopping_crit > 0:
+            if nb_iter == 0:
                 if i % 500 == 0:
                     print(f"Loss at iteration {i} = {loss}")
             elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
@@ -545,20 +548,18 @@ class ToyNetwork:
                 norm_gradW['loss_tot_var'].append(np.linalg.norm(self.compute_gradient_component('loss_tot_var')))
 
                 # Compute angles
-                dVar = self.compute_dVar(lr[1] * g['W'] * self.mask)
+                dVar = self.compute_dVar(-lr[1] * g['W'] * self.mask, -lr[0] * g['U'])
                 Var = self.compute_total_covariance()
                 U_Var, _, VT_Var = np.linalg.svd(Var)
                 upper_var = U_Var[:, :d]
                 lower_var = U_Var[:, d:]
 
-                if lr[1] > 0:
-                    max_angles['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[0]))
+                max_angles['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[0]))
                 max_angles['UpperVar_vs_VT'].append(np.rad2deg(subspace_angles(upper_var, self.V.T)[0]))
                 max_angles['LowerVar_vs_VT'].append(np.rad2deg(subspace_angles(lower_var, self.V.T)[0]))
                 max_angles['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.C.T)[0]))
 
-                if lr[1] > 0:
-                    min_angles['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[-1]))
+                min_angles['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[-1]))
                 min_angles['UpperVar_vs_VT'].append(np.rad2deg(subspace_angles(upper_var, self.V.T)[-1]))
                 min_angles['LowerVar_vs_VT'].append(np.rad2deg(subspace_angles(lower_var, self.V.T)[-1]))
                 min_angles['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.C.T)[-1]))
@@ -579,6 +580,12 @@ class ToyNetwork:
                     _, _, VDT_WM = np.linalg.svd(self.D[:, self.selected_permutation_WM])
                     A['D'].append(np.trace(VDT[:2] @ self.C @ Var @ self.C.T @ VDT[:2].T))
                     A['DP_WM'].append(np.trace(VDT_WM[:2] @ self.C @ Var @ self.C.T @ VDT_WM[:2].T))
+
+            if nb_iter == 0:
+                if i % 500 == 0:
+                    print(f"Max gradient L_V[v] w.r.t. W {i} = {np.max(self.compute_gradient_component('loss_tot_var'))}")
+            elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
+                print(f"Max gradient  L_V[v]  w.r.t. W {i} = {np.max(self.compute_gradient_component('loss_tot_var'))}")
 
             # Parameter update
             self.U -= lr[0] * g['U']
@@ -626,6 +633,20 @@ class ToyNetwork:
                                      np.outer(conditioned_means[k] - global_mean, conditioned_means[k] - global_mean))
         return total_covariance
 
+    def compute_total_input_covariance(self):
+        """
+        Compute V[x].
+
+        Return:
+        ------
+        """
+        Vx = np.zeros(shape=(self.input_size, self.input_size))
+        x_bar = self.input_noise.global_mean()
+
+        for k, p in enumerate(self.input_noise.p):
+            Vx += p * (self.input_noise.covs[k] + np.outer(self.input_noise.means[k] - x_bar, self.input_noise.means[k] - x_bar))
+        return Vx
+
     def compute_conditioned_covariances(self):
         """
         Compute V[v | k] for k = 0, ..., `self.nb_inputs`.
@@ -642,7 +663,7 @@ class ToyNetwork:
             )
         return variances
 
-    def compute_dVar(self, dW):
+    def compute_dVar(self, dW, dU):
         """
         Compute dVar[v], the differential of the total covariance.
 
@@ -652,8 +673,12 @@ class ToyNetwork:
             Weight update (= -eta_W * grad_W)
         """
         tot_var = self.compute_total_covariance()
+        Vx = self.compute_total_input_covariance()
         inv_I_minusW = np.linalg.inv(np.eye(self.network_size) - self.W)
-        return inv_I_minusW @ dW @ tot_var + tot_var @ dW.T @ inv_I_minusW.T
+        Wterm = inv_I_minusW @ dW @ tot_var
+        #(I - W)^{-1}dU \var{\x}U^\T (I - W)^{-\T}
+        Uterm = inv_I_minusW @ dU @ Vx @ self.U.T @ inv_I_minusW.T
+        return Wterm + Wterm.T + Uterm + Uterm.T
 
     def get_mean_activity(self):
         x_bar = self.input_noise.global_mean()
@@ -787,7 +812,7 @@ class ToyNetwork:
 
     def select_perturb(self, intrinsic_manifold_dim, nb_om_permuted_units=30, nb_samples=int(1e4)):
         """Select the WM and OM perturbations"""
-        nb_samples_wm = factorial(intrinsic_manifold_dim) if intrinsic_manifold_dim <= 7 else nb_samples
+        nb_samples_wm = factorial(intrinsic_manifold_dim) if intrinsic_manifold_dim <= 8 else nb_samples
         nb_samples_om = max(nb_samples, nb_samples_wm)
 
         wm_permutations = np.empty(shape=(nb_samples_wm, intrinsic_manifold_dim))
@@ -932,15 +957,27 @@ class ToyNetwork:
         return all_losses
 
     # -------------------------- Other functions -------------------------- #
-    def dimensionality(self, threshold=0.99):
-        covariance_matrix = self.compute_total_covariance()
+    @staticmethod
+    def dimensionality_(covariance_matrix, threshold=0.99):
         _, singular_values, _ = np.linalg.svd(covariance_matrix)  # using svg instead of eigvals because we want them properly ordered
         cum_var = np.cumsum(singular_values)
         return np.nonzero(cum_var > threshold * cum_var[-1])[0][0] + 1  # +1 because array elements start at zero
 
-    def participation_ratio(self):
-        covariance_matrix = self.compute_total_covariance()
+    def dimensionality(self, threshold=0.99):
+        return self.dimensionality_(self.compute_total_covariance(), threshold=threshold)
+
+    def dimensionality_input(self, threshold=0.99):
+        return self.dimensionality_(self.compute_total_input_covariance(), threshold=threshold)
+
+    @staticmethod
+    def participation_ratio_(covariance_matrix):
         return (np.trace(covariance_matrix))**2/np.trace(covariance_matrix @ covariance_matrix)
+
+    def participation_ratio(self):
+        return self.participation_ratio_(self.compute_total_covariance())
+
+    def participation_ratio_input(self):
+        return self.participation_ratio_(self.compute_total_input_covariance())
 
     # -------------------------- Save and load functions -------------------------- #
     def save(self, folder_name):

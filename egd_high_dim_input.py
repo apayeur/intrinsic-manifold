@@ -4,7 +4,7 @@ import copy
 import os
 
 def main():
-    tag = "plasticity-in-W-test2"  # identification of this experiment, for bookkeeping
+    tag = "plasticity-in-U-only-final-M6-matching-params"  # identification of this experiment, for bookkeeping
     save_dir = f"data/egd-high-dim-input/{tag}"
     save_dir_results = f"results/egd-high-dim-input/{tag}"
     if not os.path.exists(save_dir):
@@ -14,17 +14,17 @@ def main():
 
     # Parameters
     size = (200, 100, 2)
-    input_noise_intensity = 1e-3
-    private_noise_intensity = 1e-4
+    input_noise_intensity = 5e-4
+    private_noise_intensity = 5e-4
     nb_inputs = 6
-    intrinsic_manifold_dim = 10  # 6
+    intrinsic_manifold_dim = 6 #15  # 6
     input_subspace_dim = size[0]//10
     lr = 5e-3  # was 10e-3
     lr_init = (lr, lr, 0)
     lr_decoder = (lr, lr, 0)
-    lr_adapt = (0, 5.e-3, 0)  # was lr/15 (4*lr, 0, 0)
-    nb_iter = int(7e3)
-    nb_iter_adapt = int(1e3)  # was 5e3
+    lr_adapt = (0.05, 0, 0) #(0, 2e-3, 0)  # (50e-3, 0, 0)
+    nb_iter = int(10e3)
+    nb_iter_adapt = int(2e3)  # was 5e3
     seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
 
@@ -65,7 +65,8 @@ def main():
                   'loss_tot_var': {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
                                'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}}
 
-
+    # Participation ratio of initial network
+    participation_ratios = {'input': np.empty(len(seeds)), 'recurrent': np.empty(len(seeds))}
 
 
     # Normalized variance explained
@@ -91,10 +92,30 @@ def main():
                           input_subspace_dim=input_subspace_dim, nb_inputs=nb_inputs,
                           use_data_for_decoding=False,
                           global_mean_input_is_zero=False,
+                          orthogonalize_input_means=False,
                           initialization_type='random',
                           rng_seed=seed)
+        print("Total variance components")
+        cov = net0.compute_covariance()
+        print(f"Var component: {np.trace(cov['U_comp_var'])}")
+        print(f"Mean component: {np.trace(cov['U_comp_mean'])}")
+        print(f"Private component: {np.trace(cov['priv_noise_comp'])}")
+
+        if seed_id == 0:
+            net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleBeforeInitialTraining.png")
+
         l, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+
         loss_init[seed_id] = l['total']
+
+        participation_ratios['input'][seed_id] = net0.participation_ratio_input()
+        participation_ratios['recurrent'][seed_id] = net0.participation_ratio()
+
+        print(f"\nParticipation ratio for recurrent activity = {participation_ratios['recurrent'][seed_id]}")
+        print(f"Dimensionality for recurrent activity = {net0.dimensionality(threshold=0.95)}")
+        print(f"Participation ratio for input = {participation_ratios['input'][seed_id]}")
+        print(f"Dimensionality for input = {net0.dimensionality_input(threshold=0.95)}")
+
         if seed_id == 0:
             net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleEndInitialTraining.png")
 
@@ -119,7 +140,7 @@ def main():
 
         print('\n|-------------------------------- Select perturbations --------------------------------|')
         selected_wm, selected_om, wm_t_l, om_t_l = \
-            net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1])
+            net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1], nb_samples=int(1e4))
         if seed_id == 0:
             wm_total_losses, om_total_losses = wm_t_l, om_t_l
 
@@ -153,7 +174,6 @@ def main():
             min_angles['WM'][key][seed_id] = a_min[key]
             max_angles['WM'][key][seed_id] = a_max[key]
 
-
         print('\n|-------------------------------- OM perturbation --------------------------------|')
         net_om = copy.deepcopy(net2)
         net_om.network_name = 'om'
@@ -183,6 +203,7 @@ def main():
 
     # Save parameters
     param_dict = {'size': size,
+                  'nb_seeds': len(seeds),
                   'input_noise_intensity': input_noise_intensity,
                   'private_noise_intensity': private_noise_intensity,
                   'lr': lr, 'lr_init': lr_init, 'lr_decoder': lr_decoder,'lr_adapt': lr_adapt,
@@ -224,6 +245,9 @@ def main():
     # Save candidate perturbations losses
     np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
     np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)
+
+    # Save participation ratios
+    np.save(f"{save_dir}/participation_ratios", participation_ratios)
 
 
 if __name__ == '__main__':

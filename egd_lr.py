@@ -6,10 +6,13 @@ To examine the effect of the learning rate on WM and OM adaptation.
 from toy_model import ToyNetwork
 import numpy as np
 import copy
+import matplotlib.pyplot as plt
+from utils import units_convert, col_o, col_w
 import os
+plt.style.use('rnn4bci_plot_params.dms')
 
 def main():
-    tag = "effect-of-lr2"  # identification of this experiment, for bookkeeping
+    tag = "effect-of-lr-weights"  # identification of this experiment, for bookkeeping
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -26,10 +29,10 @@ def main():
     lr_init = (0, lr, 0)
     lr_decoder = (0, lr, 0)
 
-    lr_adapts = [lr/10, lr/2]  # , lr/25]
+    lr_adapts = [lr/10, lr]  # , lr/25]
 
     nb_iter = int(1e3)
-    seeds = np.arange(25, dtype=int)
+    seeds = [2] # np.arange(1, dtype=int)
     relearn_after_decoder_fitting = False
 
     # Total losses
@@ -78,6 +81,7 @@ def main():
                     net2.plot_sample(sample_size=1000,
                                      outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder_lr{learning_rate}.png")
 
+            W_init = copy.copy(net2.W)
 
             print('\n|-------------------------------- Select perturbations --------------------------------|')
             selected_wm, selected_om, wm_t_l, om_t_l = \
@@ -102,6 +106,7 @@ def main():
 
             loss_compare_lr['WM'][lr_i][seed_id] = l['total']
 
+            change_W_WM = net_wm.W - W_init
 
 
             print('\n|-------------------------------- OM perturbation --------------------------------|')
@@ -121,6 +126,20 @@ def main():
 
             loss_compare_lr['OM'][lr_i][seed_id] = l['total']
 
+            change_W_OM = net_om.W - W_init
+
+            # Plotting change in W
+            fig, ax = plt.subplots(figsize=(45 * units_convert['mm'], 45/1.25 * units_convert['mm']))
+            ax.hist(change_W_WM.flatten(), bins='auto', density=True, color=col_w, alpha=0.5, label=r"init $\rightarrow$ WM")
+            ax.hist(change_W_OM.flatten(), bins='auto', density=True, color=col_o, alpha=0.5, label=r"init $\rightarrow$ OM")
+            ax.legend(loc='upper right')
+            ax.set_xlabel("Weight change")
+            ax.set_ylabel("Probability density")
+            ax.set_title(r"$\eta_W = $ {:1.0e}".format(learning_rate), y=0.8, loc='left')
+            ax.set_xlim([-0.025, 0.025])
+            plt.tight_layout()
+            plt.savefig(f"{save_dir_results}/WeightDistributions_seed{seed}_lr{learning_rate}.png")
+            plt.close()
 
     # Save parameters
     param_dict = {'size': size,

@@ -5,7 +5,7 @@ import os
 from scipy.linalg import subspace_angles
 
 def main():
-    tag = "final_more_seeds"  # identification of this experiment, for bookkeeping
+    tag = "test-rich"  # identification of this experiment, for bookkeeping
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -22,9 +22,9 @@ def main():
     lr_init = (0, lr, 0)
     lr_decoder = (0, lr, 0)
     lr_adapt = (0, lr/15, 0)  # was lr/15
-    nb_iter = int(1e3)
+    nb_iter = int(5e3)
     nb_iter_adapt = int(5e3)  # was 5e3
-    seeds = np.arange(25, dtype=int)
+    seeds = np.arange(1, dtype=int)
     relearn_after_decoder_fitting = False
 
     # Total losses
@@ -97,6 +97,7 @@ def main():
                           initialization_type='random',
                           rng_seed=seed)
         l, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+        print(f"Max eigenvalue of W: {np.max(np.abs(np.linalg.eigvals(net0.W)))}")
         loss_init[seed_id] = l['total']
         if seed_id == 0:
             net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleEndInitialTraining.png")
@@ -158,6 +159,8 @@ def main():
             min_angles['WM'][key][seed_id] = a_min[key]
             max_angles['WM'][key][seed_id] = a_max[key]
 
+        print(f"Max eigenvalue of W: {np.max(np.abs(np.linalg.eigvals(net_wm.W)))}")
+
 
         print('\n|-------------------------------- OM perturbation --------------------------------|')
         net_om = copy.deepcopy(net2)
@@ -187,9 +190,11 @@ def main():
             min_angles['OM'][key][seed_id] = a_min[key]
             max_angles['OM'][key][seed_id] = a_max[key]
 
+        print(f"Max eigenvalue of W: {np.max(np.abs(np.linalg.eigvals(net_om.W)))}")
 
     # Save parameters
     param_dict = {'size': size,
+                  'nb_seeds': len(seeds),
                   'input_noise_intensity': input_noise_intensity,
                   'private_noise_intensity': private_noise_intensity,
                   'lr': lr, 'lr_init': lr_init, 'lr_decoder': lr_decoder,'lr_adapt': lr_adapt,

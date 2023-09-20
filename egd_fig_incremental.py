@@ -5,8 +5,8 @@ import os
 import seaborn as sns
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/incremental-training"
-save_fig_dir = "results/egd/incremental-training"
+load_dir = "data/egd/incremental-training-no-partial-increment"
+save_fig_dir = "results/egd/incremental-training-no-partial-increment"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
