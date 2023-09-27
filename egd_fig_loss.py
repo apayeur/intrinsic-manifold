@@ -1,13 +1,28 @@
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
+mpl.rcParams['font.size'] = 7
 
-load_dir = "data/egd-high-dim-input/plasticity-in-U-only-final-M6-matching-params"
-save_fig_dir = "results/egd-high-dim-input/plasticity-in-U-only-final-M6-matching-params"
+exponent_W = 0.8
+tag = f"exponent_W{exponent_W}-lr0.001-M6"
+load_dir = f"data/egd/{tag}"
+save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
+
+output_fig_format = 'png'
+
+# Exclude seed if an eigen val becomes unstable
+max_eigvals = {'W_WM': np.load(f"{load_dir}/eigenvals_after_WMP.npy"),
+               'W_OM': np.load(f"{load_dir}/eigenvals_after_OMP.npy")}
+for perturbation_type in ['WM', 'OM']:
+    print(max_eigvals[f"W_{perturbation_type}"])
+seeds_to_exclude = np.where(max_eigvals['W_OM'] > 1)[0]
+params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
+seeds_to_include = [i for i in range(params['nb_seeds']) if i not in seeds_to_exclude]
 
 loss_dict = np.load(f"{load_dir}/loss.npy", allow_pickle=True).item()
 loss = loss_dict['loss']
@@ -18,11 +33,21 @@ loss_corr = loss_dict['loss_corr']
 loss_proj = loss_dict['loss_proj']
 loss_vbar = loss_dict['loss_vbar']
 
-params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
+
+loss_init = loss_init[seeds_to_include]
+for perturbation_type in ['WM', 'OM']:
+    loss[perturbation_type] = loss[perturbation_type][seeds_to_include]
+    loss_var[perturbation_type] = loss_var[perturbation_type][seeds_to_include]
+    loss_exp[perturbation_type] = loss_exp[perturbation_type][seeds_to_include]
+    loss_corr[perturbation_type] = loss_corr[perturbation_type][seeds_to_include]
+    loss_proj[perturbation_type] = loss_proj[perturbation_type][seeds_to_include]
+    loss_vbar[perturbation_type] = loss_vbar[perturbation_type][seeds_to_include]
+
+
 nb_iter = params['nb_iter']
 nb_iter_adapt = params['nb_iter_adapt']
 
-x_label = 'Weight update post-perturbation' if 'egd' in load_dir else 'Epoch'
+x_label = 'Weight update post-perturb.' if 'egd' in load_dir else 'Epoch'
 
 # ------------------------ Loss-related figures ------------------------ #
 # Plot initial loss
@@ -32,7 +57,7 @@ for l in loss_init:
 plt.xlabel('Weight update')
 plt.ylabel('Loss')
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/InitialLoss.png')
+plt.savefig(f'{save_fig_dir}/InitialLoss.{output_fig_format}')
 plt.close()
 
 # Plot adaptation loss for each seed
@@ -44,35 +69,35 @@ plt.xlabel(x_label)
 plt.ylabel('Loss')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/LossAdaptForEachSeed.png')
+plt.savefig(f'{save_fig_dir}/LossAdaptForEachSeed.{output_fig_format}')
 plt.close()
 
 # Plot mean +/- 2SEM adaptation loss
 plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
-m_wm, m_om = np.mean(loss['WM'], axis=0), np.mean(loss['OM'], axis=0)
-std_wm, std_om = np.std(loss['WM'], axis=0, ddof=1), np.std(loss['OM'], axis=0, ddof=1)
-plt.plot(np.arange(m_wm.shape[0]), m_wm, label='WM', color=col_w, lw=0.5)
-plt.plot(np.arange(m_om.shape[0]), m_om, '--', label='OM', color=col_o, lw=0.5)
-plt.fill_between(np.arange(m_wm.shape[0]),
-                 m_wm - 2*std_wm/loss['WM'].shape[0]**0.5,
-                 m_wm + 2*std_wm/loss['WM'].shape[0]**0.5,
-                 color=col_w, lw=0, alpha=0.5)
-plt.fill_between(np.arange(m_om.shape[0]),
-                 m_om - 2*std_om/loss['OM'].shape[0]**0.5,
-                 m_om + 2*std_om/loss['OM'].shape[0]**0.5,
-                 color=col_o, lw=0, alpha=0.5)
-#plt.ylim([0,0.5])
-#plt.xlim([0,4000])
+for perturbation_type in ['WM', 'OM']:
+    perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
+    m = np.mean(perf, axis=0)
+    std = np.std(perf, axis=0, ddof=1)
+    plt.plot(np.arange(m.shape[0]), m, label=perturbation_type,
+             color=col_w if perturbation_type=='WM' else col_o, lw=0.5)
+    plt.fill_between(np.arange(m.shape[0]),
+                     m- 2*std/loss['WM'].shape[0]**0.5,
+                     m + 2*std/loss['WM'].shape[0]**0.5,
+                     color=col_w if perturbation_type=='WM' else col_o, lw=0, alpha=0.5)
+plt.ylim([0,1])
+plt.yticks([0,0.5,1])
+plt.xlim([0, m.shape[0]])
+plt.xticks(np.arange(0, plt.gca().get_xlim()[-1], 100))
 plt.xlabel(x_label)
-plt.ylabel('Loss')
+plt.ylabel('Normalized loss $L/L_0$')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/LossAdapt.png')
+plt.savefig(f'{save_fig_dir}/LossAdapt.{output_fig_format}')
 plt.close()
 
 
 # Plot subsampled relative performance
-subsampling = nb_iter_adapt // 10
+subsampling = nb_iter_adapt // nb_iter_adapt
 shift = nb_iter_adapt // 50  # for clearer plot
 plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
 for i in range(loss['WM'].shape[0]):
@@ -89,7 +114,7 @@ plt.xlabel(x_label)
 plt.ylabel('Retraining performance')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/SubsampledPerformance.png')
+plt.savefig(f'{save_fig_dir}/SubsampledPerformance.{output_fig_format}')
 plt.close()
 
 # Plot subsampled relative performance mean +/- SEM
@@ -104,13 +129,13 @@ for perturbation_type in ['WM', 'OM']:
     plt.errorbar(np.arange(0, loss[perturbation_type].shape[1], subsampling), m[::subsampling],
                  yerr=2*s[::subsampling] / s.shape[0]**0.5, fmt='o-',
                  color=col_w if perturbation_type == 'WM' else col_o,
-                 markersize=3, markeredgewidth=0, label=perturbation_type, lw=0.5)
+                 markersize=1.5, markeredgewidth=0, label=perturbation_type, lw=0.5)
 plt.yticks([0, 1])
 plt.xlabel(x_label)
 plt.ylabel('Retraining performance')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/SubsampledPerformance_Stat.png')
+plt.savefig(f'{save_fig_dir}/SubsampledPerformance_Stat.{output_fig_format}')
 plt.close()
 
 # Plot loss components
@@ -139,7 +164,7 @@ ax_exp.set_ylabel('Expectation component\nof the loss')
 ax_exp.set_xlabel(x_label)
 ax_var.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/LossComponents.png')
+plt.savefig(f'{save_fig_dir}/LossComponents.{output_fig_format}')
 plt.close()
 
 # Plot loss components correlation and projection
@@ -172,8 +197,8 @@ ax_exp.set_xlabel(x_label)
 ax_var.legend()
 fig_var.tight_layout()
 fig_exp.tight_layout()
-fig_var.savefig(f'{save_fig_dir}/LossComponentsCorr.png')
-fig_exp.savefig(f'{save_fig_dir}/LossComponentsProj.png')
+fig_var.savefig(f'{save_fig_dir}/LossComponentsCorr.{output_fig_format}')
+fig_exp.savefig(f'{save_fig_dir}/LossComponentsProj.{output_fig_format}')
 plt.close()
 
 # Plot total-covariance loss component vs vbar-related loss component
@@ -197,7 +222,7 @@ plt.xlabel(x_label)
 plt.ylabel(r'$\frac{1}{2}\|\|V \bar{\mathbf{v}} \|  \|^2$')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/Loss_vbar.png')
+plt.savefig(f'{save_fig_dir}/Loss_vbar.{output_fig_format}')
 plt.close()
 
 
@@ -222,7 +247,7 @@ plt.xlabel(x_label)
 plt.ylabel(r'$\frac{1}{2}$tr$\{V \mathbb{V}[\bar{\mathbf{v}}] V^\mathsf{T}\}$')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/Loss_TotalVariance.png')
+plt.savefig(f'{save_fig_dir}/Loss_TotalVariance.{output_fig_format}')
 plt.close()
 
 

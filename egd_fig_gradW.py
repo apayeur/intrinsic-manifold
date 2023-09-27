@@ -4,8 +4,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/test"
-save_fig_dir = "results/egd/test"
+load_dir = "data/egd/test-rich3"
+save_fig_dir = "results/egd/test-rich3"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -27,10 +27,10 @@ plt.fill_between(np.arange(m_om.shape[0]),
                  m_om + 2*std_om/norm_gradW['loss']['OM'].shape[0]**0.5,
                  color=col_o, lw=0, alpha=0.5)
 plt.ylim(ymin=0)
-plt.ylim(ymax=15)
+#plt.ylim(ymax=15)
 plt.yticks(list(plt.gca().get_ylim()))
 plt.xlabel('Weight update post-perturbation')
-plt.ylabel(r'$\|\|\nabla_W L\|\|_F$')
+plt.ylabel(r'$\|\nabla_W L\|_F$')
 plt.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/NormGradWTotal.png')
@@ -55,7 +55,7 @@ plt.ylim(ymax=150)
 
 plt.yticks(list(plt.gca().get_ylim()))
 plt.xlabel('Weight update post-perturbation')
-plt.ylabel(r'$\|\| \nabla_W L_{\mathbb{V}[\mathbf{v}]}\|\|_F$')
+plt.ylabel(r'$\| \nabla_W L_{\mathbb{V}[\mathbf{v}]}\|_F$')
 plt.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/NormGradWVar.png')

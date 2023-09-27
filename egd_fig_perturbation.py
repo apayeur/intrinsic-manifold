@@ -4,13 +4,18 @@ Description:
 Code for figure 1B: Distribution of the pre-adaptation losses for WM and OM. Indicate median loss.
 """
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final_more_seeds"
-save_fig_dir = "results/egd/final_more_seeds"
+mpl.rcParams['font.size'] = 7
+
+exponent_W = 0.55
+tag = f"test-rich-exponent_W{exponent_W}-test-lr1e-3-training-ex"
+load_dir = f"data/egd/{tag}"
+save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -28,6 +33,6 @@ plt.xlabel('Loss')
 plt.ylabel('Count')
 plt.legend()
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/LossDistributionsCandidate.png')
+plt.savefig(f'{save_fig_dir}/LossDistributionsCandidate.pdf')
 plt.close()
 plt.show()

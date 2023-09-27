@@ -11,6 +11,7 @@ import itertools
 from math import factorial
 from scipy.linalg import subspace_angles
 
+
 class ToyNetwork:
     """
     A static, linear and Gaussian neural network.
@@ -69,7 +70,7 @@ class ToyNetwork:
         How sparse is the recurrent matrix.
     """
     def __init__(self, network_name, size=(100,50,2), nb_inputs=8, private_noise_intensity=1e-3,
-                 input_noise_intensity=1e-2, input_subspace_dim=100, initialization_type='random',
+                 input_noise_intensity=1e-2, input_subspace_dim=100, initialization_type='random', exponent_W=0.5,
                  global_mean_input_is_zero=True, use_data_for_decoding=False, orthogonalize_input_means=True,
                  rng_seed=1, sparsity_factor=1):
         self.size = size
@@ -108,7 +109,7 @@ class ToyNetwork:
             self.targets = [np.array([1]), np.array([-1])]
 
         # Network parameter initialization
-        self.U, self.W, self.V, self.b = self.init_params(type_=initialization_type)
+        self.U, self.W, self.V, self.b = self.init_params(type_=initialization_type, exponent_W=exponent_W)
 
         # Sparsity
         self.mask = np.ones_like(self.W)
@@ -162,17 +163,18 @@ class ToyNetwork:
                     covs.append(self.input_noise_intensity * Q @ Q.T / self.input_subspace_dim)
         return GaussianMixture(means, covs, rng=self.rng)
 
-    def init_params(self, type_='random'):
+    def init_params(self, type_='random', exponent_W=0.5):
         if type_ == 'random':
             if self.nb_inputs == self.input_size and self.input_noise_intensity < 1e-6:
                 U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
             else:
                 U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size ** 0.5
-            # DEGUG!!!!!!!!!
-            #W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** 0.5
-            W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** 0.5
+            W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
         elif type_ == 'W-zero':
-            U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size ** 0.5
+            if self.nb_inputs == self.input_size and self.input_noise_intensity < 1e-6:
+                U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
+            else:
+                U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size ** 0.5
             W = np.zeros(shape=(self.network_size, self.network_size))
         elif type_ == 'zero-all':
             U = np.zeros(shape=(self.network_size, self.input_size))
@@ -247,6 +249,11 @@ class ToyNetwork:
             L_exp += 0.5 * p * np.linalg.norm(self.V @ Exp_v_given_k - self.targets[c])**2
 
         return L_var, L_exp
+
+    def floor_loss(self):
+        I = np.eye(self.network_size)
+        inv_I_minus_W = np.linalg.inv(I - self.W)
+        return 0.5*np.trace(self.V @ inv_I_minus_W @ self.private_noise.cov @ inv_I_minus_W.T @ self.V.T)
 
     def loss_components_correlation_and_projection(self):
         """Compute the loss as L = 0.5 + 0.5 * tr[V(Cov + vbar@vbar.T)V] - mean projection.
@@ -506,6 +513,8 @@ class ToyNetwork:
         R = []
         A = {'D': [],
              'DP_WM': []}
+        f = []
+        rel_proj_var_OM = []
 
         if self.D is not None:
             d = self.D.shape[1]
@@ -536,8 +545,7 @@ class ToyNetwork:
                 if i % 500 == 0:
                     print(f"Loss at iteration {i} = {loss}")
             elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
-                print(f"Loss at iteration {i} = {loss}")
-
+                print(f"Loss at iteration {i} = {loss} | floor ratio = {self.floor_loss() / loss}")
 
             # Compute gradient
             g = self.compute_gradient()
@@ -568,12 +576,15 @@ class ToyNetwork:
                 beta1 = np.trace(self.C @ Var_init @ self.C.T) / np.trace(Var_init)
                 beta2 = np.trace(self.C @ Var @ self.C.T) / np.trace(Var)  # note that self.C is never reassigned, so it stays at its initial value
                 normalized_variance_explained.append(beta2 / beta1)
+                f.append(beta2)
 
                 if self.selected_permutation_OM is not None:
                     tmp1 = np.trace(self.C[:, self.selected_permutation_OM] @ Var
                                     @ self.C[:, self.selected_permutation_OM].T)
                     tmp2 = np.trace(self.C @ Var @ self.C.T)
                     R.append(tmp1/tmp2)
+                    rel_proj_var_OM.append(tmp1 / np.trace(self.C[:, self.selected_permutation_OM] @ Var_init
+                                    @ self.C[:, self.selected_permutation_OM].T))
 
                 if self.selected_permutation_WM is not None:
                     _, _, VDT = np.linalg.svd(self.D)
@@ -581,18 +592,21 @@ class ToyNetwork:
                     A['D'].append(np.trace(VDT[:2] @ self.C @ Var @ self.C.T @ VDT[:2].T))
                     A['DP_WM'].append(np.trace(VDT_WM[:2] @ self.C @ Var @ self.C.T @ VDT_WM[:2].T))
 
-            if nb_iter == 0:
-                if i % 500 == 0:
-                    print(f"Max gradient L_V[v] w.r.t. W {i} = {np.max(self.compute_gradient_component('loss_tot_var'))}")
-            elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
-                print(f"Max gradient  L_V[v]  w.r.t. W {i} = {np.max(self.compute_gradient_component('loss_tot_var'))}")
+            #if nb_iter == 0:
+            #    if i % 500 == 0:
+            #        print(f"Max gradient L_V[v] w.r.t. W {i} = {np.max(self.compute_gradient_component('loss_tot_var'))}")
+            #elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
+            #    print(f"Max gradient  L_V[v]  w.r.t. W {i} = {np.max(self.compute_gradient_component('loss_tot_var'))}")
 
             # Parameter update
             self.U -= lr[0] * g['U']
             self.W -= lr[1] * g['W'] * self.mask
             self.b -= lr[2] * g['b']
+            max_eig_valW = np.max(np.abs(np.linalg.eigvals(self.W)))
+            #if max_eig_valW > 1:
+            #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
             i += 1
-        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A
+        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM
 
     # -------------------------- Functions related to statistics of the network -------------------------- #
     def compute_covariance(self):
