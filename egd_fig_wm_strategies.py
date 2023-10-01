@@ -9,6 +9,7 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
+
 # Functions
 def find_adaptation_time(loss, loss_fractions):
     """Find adaptation times that correspond to the prescribed loss fractions."""
@@ -20,8 +21,8 @@ def find_adaptation_time(loss, loss_fractions):
 
 
 # Loading data
-load_dir = "data/egd-high-dim-input/plasticity-in-U-only-final-M6-matching-params"
-save_fig_dir = "results/egd-high-dim-input/plasticity-in-U-only-final-M6-matching-params"
+load_dir = "data/egd-high-dim-input/plasticity-in-U-and-W-final-M6-matching-params-NEW"
+save_fig_dir = "results/egd-high-dim-input/plasticity-in-U-and-W-final-M6-matching-params-NEW"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -73,9 +74,9 @@ axes[1].set_ylabel('Change in decoder-projected\ncovariability (%)')
 for ax in axes:
     ax.set_xticks(100*np.array(loss_fractions))
     ax.set_xticklabels([int(100*l) for l in loss_fractions])
+    ax.set_ylim(ymax=850)
+    ax.set_yticks(np.arange(0, 810, 200))
 
-axes[0].set_ylim(ymax=1600)
-axes[1].set_ylim(ymax=1600)
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/Strategies.png')
 plt.close()

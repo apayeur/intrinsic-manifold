@@ -70,7 +70,7 @@ class ToyNetwork:
         How sparse is the recurrent matrix.
     """
     def __init__(self, network_name, size=(100,50,2), nb_inputs=8, private_noise_intensity=1e-3,
-                 input_noise_intensity=1e-2, input_subspace_dim=100, initialization_type='random', exponent_W=0.5,
+                 input_noise_intensity=1e-2, input_subspace_dim=100, initialization_type='random', exponent_W=0.55,
                  global_mean_input_is_zero=True, use_data_for_decoding=False, orthogonalize_input_means=True,
                  rng_seed=1, sparsity_factor=1):
         self.size = size

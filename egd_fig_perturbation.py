@@ -13,7 +13,7 @@ plt.style.use('rnn4bci_plot_params.dms')
 mpl.rcParams['font.size'] = 7
 
 exponent_W = 0.55
-tag = f"test-rich-exponent_W{exponent_W}-test-lr1e-3-training-ex"
+tag = f"exponent_W{exponent_W}-test-lr1e-3-training-ex"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):

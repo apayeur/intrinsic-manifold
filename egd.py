@@ -14,18 +14,18 @@ def main():
     private_noise_intensity = 1e-2  # 1e-3
     intrinsic_manifold_dim = 6  # 6
     lr_init = (0, 1e-2, 0)
-    lr_decoder = (0, 1e-3, 0)
-    lr_adapt = (0, 1e-3, 0)  # was lr/15
+    lr_decoder = (0, 5e-3, 0)
+    lr_adapt = (0, 0.001, 0)  # was lr/15
     nb_iter = int(5e2)  # int(1e3)
-    nb_iter_adapt = int(5e2)  # was 5e3
+    nb_iter_adapt = int(2e3)  # was 5e3
     seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
-    exponents_W = [0.55, 0.6, 0.7, 0.8, 0.9, 1.0]
+    exponents_W = [0.55, 0.6, 0.7, 0.8, 0.9]
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}"  # identification of this experiment, for bookkeeping
+        tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}"  # identification of this experiment, for bookkeeping
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
         if not os.path.exists(save_dir):
@@ -33,6 +33,7 @@ def main():
         if not os.path.exists(save_dir_results):
             os.makedirs(save_dir_results)
 
+        # DEFINITION OF DATA CONTAINERS FOR SAVED DATA
         # Total losses
         loss_init = np.empty(shape=(len(seeds), nb_iter))
         loss = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
@@ -100,6 +101,11 @@ def main():
         eigenvals_after_WMP = []
         eigenvals_after_OMP = []
 
+        # Participation ratio
+        p_ratio = {'initial': np.empty(shape=len(seeds)),
+                   'WM': np.empty(shape=len(seeds)),
+                   'OM': np.empty(shape=len(seeds))}
+
         for seed_id, seed in enumerate(seeds):
             print(f'\n|==================================== Seed {seed} =====================================|')
             print('\n|-------------------------------- Initial training --------------------------------|')
@@ -112,10 +118,18 @@ def main():
                               initialization_type='random', exponent_W=exponent_W,
                               rng_seed=seed)
             l, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+
+            # compute max eigenvalue
             eigval_init = np.max(np.abs(np.linalg.eigvals(net0.W)))
             print(f"Max eigenvalue of W: {eigval_init}")
             eigenvals_init.append(eigval_init)
+
+            # compute participation ratio
+            p_ratio['initial'][seed_id] = net0.participation_ratio()
+
+            # save loss
             loss_init[seed_id] = l['total']
+
             if seed_id == 0:
                 net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
 
@@ -178,6 +192,8 @@ def main():
             print(f"Max eigenvalue of W: {eigval_after_WM}")
             eigenvals_after_WMP.append(eigval_after_WM)
 
+            p_ratio['WM'][seed_id] = net_wm.participation_ratio()
+
             print('\n|-------------------------------- OM perturbation --------------------------------|')
             net_om = copy.deepcopy(net2)
             net_om.network_name = 'om'
@@ -211,6 +227,8 @@ def main():
             eigval_after_OM = np.max(np.abs(np.linalg.eigvals(net_om.W)))
             print(f"Max eigenvalue of W: {eigval_after_OM}")
             eigenvals_after_OMP.append(eigval_after_OM)
+
+            p_ratio['OM'][seed_id] = net_om.participation_ratio()
 
         # Save parameters
         param_dict = {'size': size,
@@ -275,6 +293,9 @@ def main():
         np.save(f"{save_dir}/eigenvals_init", eigenvals_init)
         np.save(f"{save_dir}/eigenvals_after_WMP", eigenvals_after_WMP)
         np.save(f"{save_dir}/eigenvals_after_OMP", eigenvals_after_OMP)
+
+        # Save participation ratios
+        np.save(f"{save_dir}/participation_ratio", p_ratio)
 
 
 if __name__ == '__main__':

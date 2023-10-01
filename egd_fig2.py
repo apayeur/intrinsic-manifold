@@ -14,8 +14,8 @@ plt.style.use('rnn4bci_plot_params.dms')
 mpl.rcParams['font.size'] = 7
 
 # Set load and save directories
-load_dir = "data/egd/test-rich3"
-save_fig_dir = "results/egd/test-rich3"
+load_dir = "data/egd/exponent_W0.55-lr0.001-M6"
+save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -68,7 +68,8 @@ for perturbation_type in ['WM', 'OM']:
                      color=col_w if perturbation_type == 'WM' else col_o, alpha=0.5, lw=0)
 axes[1,0].set_xlabel('Weight update post-perturb.')
 axes[1,0].set_ylabel('Manifold overlap')
-axes[1,0].set_xticks([0, 2000, 4000])
+#axes[1,0].set_xticks([0, 2000, 4000])
+axes[1,0].set_yticks([0.9, 0.95, 1])
 axes[1,0].set_title('C', loc='left', pad=0, weight='bold', fontsize=8)
 # Panel D
 m_wm, m_om = np.mean(norm_gradW['loss']['WM'], axis=0), np.mean(norm_gradW['loss']['OM'], axis=0)
@@ -83,15 +84,20 @@ axes[1,1].fill_between(np.arange(m_om.shape[0]),
                  m_om - 2*std_om/norm_gradW['loss']['OM'].shape[0]**0.5,
                  m_om + 2*std_om/norm_gradW['loss']['OM'].shape[0]**0.5,
                  color=col_o, lw=0, alpha=0.5)
-axes[1,1].set_ylim([0, 15])
+axes[1,1].set_ylim([0, 5])
 axes[1,1].set_yticks(list(plt.gca().get_ylim()))
-axes[1,1].set_xticks([0, 2000, 4000])
+#axes[1,1].set_xticks([0, 2000, 4000])
 axes[1,1].set_xlabel('Weight update post-perturb.')
 axes[1,1].set_ylabel(r'$\|\nabla_W L\|_F$')
 axes[1,1].set_title('D', loc='left', pad=0, weight='bold', fontsize=8)
 #for ax in axes.ravel():
 #    sns.despine(ax=ax)
 plt.tight_layout()
+
+for ax in axes.ravel():
+    ax.set_xlim([0, 500])
+    ax.set_xticks([0, 500])
+
 plt.savefig(f'{save_fig_dir}/fig2.png')
 plt.close()
 plt.show()

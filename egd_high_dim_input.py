@@ -4,14 +4,6 @@ import copy
 import os
 
 def main():
-    tag = "plasticity-in-U-only-final-M6-matching-params"  # identification of this experiment, for bookkeeping
-    save_dir = f"data/egd-high-dim-input/{tag}"
-    save_dir_results = f"results/egd-high-dim-input/{tag}"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    if not os.path.exists(save_dir_results):
-        os.makedirs(save_dir_results)
-
     # Parameters
     size = (200, 100, 2)
     input_noise_intensity = 5e-4
@@ -22,11 +14,26 @@ def main():
     lr = 5e-3  # was 10e-3
     lr_init = (lr, lr, 0)
     lr_decoder = (lr, lr, 0)
-    lr_adapt = (0.05, 0, 0) #(0, 2e-3, 0)  # (50e-3, 0, 0)
+    lr_adapt = (0, 1e-3, 0) #(0, 2e-3, 0)  # (50e-3, 0, 0)
     nb_iter = int(10e3)
     nb_iter_adapt = int(2e3)  # was 5e3
     seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
+
+    if lr_adapt[0] > 0 and abs(lr_adapt[1]) < 1e-7:
+        prefix = "plasticity-in-U-only"
+    elif lr_adapt[1] > 0 and abs(lr_adapt[0]) < 1e-7:
+        prefix = "plasticity-in-W-only"
+    elif lr_adapt[0] > 0 and lr_adapt[1]:
+        prefix = "plasticity-in-U-and-W"
+
+    tag = f"{prefix}-M{intrinsic_manifold_dim}-lrU{lr_adapt[0]}-lrW{lr_adapt[1]}"  # identification of this experiment, for bookkeeping
+    save_dir = f"data/egd-high-dim-input/{tag}"
+    save_dir_results = f"results/egd-high-dim-input/{tag}"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    if not os.path.exists(save_dir_results):
+        os.makedirs(save_dir_results)
 
     # Total losses
     loss_init = np.empty(shape=(len(seeds), nb_iter))
@@ -68,7 +75,6 @@ def main():
     # Participation ratio of initial network
     participation_ratios = {'input': np.empty(len(seeds)), 'recurrent': np.empty(len(seeds))}
 
-
     # Normalized variance explained
     normalized_variance_explained = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
                                      'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
@@ -82,6 +88,11 @@ def main():
 
     # Candidate perturbation losses
     wm_total_losses, om_total_losses = None, None
+
+    # Eigenvalues
+    eigenvals_init = []
+    eigenvals_after_WMP = []
+    eigenvals_after_OMP = []
 
     for seed_id, seed in enumerate(seeds):
         print(f'\n|==================================== Seed {seed} =====================================|')
@@ -104,7 +115,10 @@ def main():
         if seed_id == 0:
             net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleBeforeInitialTraining.png")
 
-        l, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+        l, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+        eigval_init = np.max(np.abs(np.linalg.eigvals(net0.W)))
+        print(f"Max eigenvalue of W: {eigval_init}")
+        eigenvals_init.append(eigval_init)
 
         loss_init[seed_id] = l['total']
 
@@ -133,7 +147,7 @@ def main():
         net2 = copy.deepcopy(net1)
         net2.network_name = 'retrained_after_fitted'
         if relearn_after_decoder_fitting:
-            loss_decoder_retraining, _, _, _, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+            loss_decoder_retraining, _, _, _, _, _, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
             if seed_id == 0:
                 net2.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.png")
 
@@ -152,7 +166,7 @@ def main():
         if seed_id == 0:
             net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.png")
 
-        l, norm, a_min, a_max, nve, _, A_tmp = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+        l, norm, a_min, a_max, nve, _, A_tmp, _, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
         if seed_id == 0:
             net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.png")
@@ -174,6 +188,10 @@ def main():
             min_angles['WM'][key][seed_id] = a_min[key]
             max_angles['WM'][key][seed_id] = a_max[key]
 
+        eigval_after_WM = np.max(np.abs(np.linalg.eigvals(net_wm.W)))
+        print(f"Max eigenvalue of W: {eigval_after_WM}")
+        eigenvals_after_WMP.append(eigval_after_WM)
+
         print('\n|-------------------------------- OM perturbation --------------------------------|')
         net_om = copy.deepcopy(net2)
         net_om.network_name = 'om'
@@ -182,7 +200,7 @@ def main():
         if seed_id == 0:
             net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.png")
 
-        l, norm, a_min, a_max, nve, R_seed, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+        l, norm, a_min, a_max, nve, R_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
         if seed_id == 0:
             net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.png")
@@ -200,6 +218,10 @@ def main():
         for key in min_angles['OM'].keys():
             min_angles['OM'][key][seed_id] = a_min[key]
             max_angles['OM'][key][seed_id] = a_max[key]
+
+        eigval_after_OM = np.max(np.abs(np.linalg.eigvals(net_om.W)))
+        print(f"Max eigenvalue of W: {eigval_after_OM}")
+        eigenvals_after_OMP.append(eigval_after_OM)
 
     # Save parameters
     param_dict = {'size': size,
@@ -248,6 +270,11 @@ def main():
 
     # Save participation ratios
     np.save(f"{save_dir}/participation_ratios", participation_ratios)
+
+    # Save eigenvalues
+    np.save(f"{save_dir}/eigenvals_init", eigenvals_init)
+    np.save(f"{save_dir}/eigenvals_after_WMP", eigenvals_after_WMP)
+    np.save(f"{save_dir}/eigenvals_after_OMP", eigenvals_after_OMP)
 
 
 if __name__ == '__main__':
