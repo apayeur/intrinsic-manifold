@@ -7,13 +7,15 @@ plt.style.use('rnn4bci_plot_params.dms')
 mpl.rcParams['font.size'] = 7
 
 exponents_W = [0.55, 0.6, 0.7, 0.8, 0.9, 1]
-
+mpl.rcParams['axes.linewidth'] = 0.5
+mpl.rcParams['xtick.major.width'] = 0.5
+mpl.rcParams['ytick.major.width'] = 0.5
 
 
 for exponent_W in exponents_W:
     tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt2000"
     model_type = "egd" #"egd-high-dim-input"  #
-    #tag = "plasticity-in-U-only-final-M6-matching-params-NEW"
+    #tag = "plasticity-in-W-only-M6-lrU0-lrW0.001"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
     if not os.path.exists(save_fig_dir):
@@ -21,12 +23,16 @@ for exponent_W in exponents_W:
 
     output_fig_format = 'png'
 
-    # Exclude seed if an eigen val becomes unstable
+    # Exclude seed if max eigenvalue of W becomes unstable (> 1)
     max_eigvals = {'W_WM': np.load(f"{load_dir}/eigenvals_after_WMP.npy"),
                    'W_OM': np.load(f"{load_dir}/eigenvals_after_OMP.npy")}
     for perturbation_type in ['WM', 'OM']:
         print(max_eigvals[f"W_{perturbation_type}"])
     seeds_to_exclude = np.where(max_eigvals['W_OM'] > 1)[0]
+    nb_unstable_seed_WM = len(np.where(max_eigvals['W_WM'] > 1)[0])
+    print("Nb of unstable seeds WM", nb_unstable_seed_WM)
+    print("Nb of unstable seeds OM", nb_unstable_seed_WM)
+
     #seeds_to_exclude =[]
     params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
     seeds_to_include = [i for i in range(params['nb_seeds']) if i not in seeds_to_exclude]
@@ -40,7 +46,6 @@ for exponent_W in exponents_W:
     loss_proj = loss_dict['loss_proj']
     loss_vbar = loss_dict['loss_vbar']
 
-
     loss_init = loss_init[seeds_to_include]
     for perturbation_type in ['WM', 'OM']:
         loss[perturbation_type] = loss[perturbation_type][seeds_to_include]
@@ -49,7 +54,6 @@ for exponent_W in exponents_W:
         loss_corr[perturbation_type] = loss_corr[perturbation_type][seeds_to_include]
         loss_proj[perturbation_type] = loss_proj[perturbation_type][seeds_to_include]
         loss_vbar[perturbation_type] = loss_vbar[perturbation_type][seeds_to_include]
-
 
     nb_iter = params['nb_iter']
     nb_iter_adapt = params['nb_iter_adapt']
@@ -71,6 +75,7 @@ for exponent_W in exponents_W:
     nb_seed_with_nonmonotone_learning = {'WM': 0, 'OM': 0}
     plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
     for perturbation_type in ['WM', 'OM']:
+        print(loss[perturbation_type].shape[0])
         for i in range(loss[perturbation_type].shape[0]):
             perf = loss[perturbation_type][i] / loss[perturbation_type][i, 0]
             if np.any(np.gradient(perf) > 0):
@@ -82,8 +87,10 @@ for exponent_W in exponents_W:
               f"{nb_seed_with_nonmonotone_learning[perturbation_type]}/{loss[perturbation_type].shape[0]}")
     plt.xlabel(x_label)
     plt.ylabel('$L/L_0$')
-    plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
-    plt.xlim([0, 100])
+    #plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
+    plt.xlim([0, 500])
+    plt.xticks(plt.gca().get_xlim())
+    plt.ylim([0,1])
     plt.yticks([0,0.5,1])
     plt.legend(loc='upper right')
     plt.tight_layout()
@@ -104,11 +111,11 @@ for exponent_W in exponents_W:
                          color=col_w if perturbation_type=='WM' else col_o, lw=0, alpha=0.5)
     plt.ylim([0,1])
     plt.yticks([0,0.5,1])
-    plt.xlim([0, len(m)])
-    plt.xlim([0, 300])
-    plt.xticks(np.arange(0, plt.gca().get_xlim()[-1], len(m) // 5))
+    #plt.xlim([0, len(m)])
+    plt.xlim([0, 500])
+    plt.xticks(plt.gca().get_xlim())
     plt.xlabel(x_label)
-    plt.ylabel('Normalized loss $L/L_0$')
+    plt.ylabel('$L/L_0$')
     plt.legend()
     plt.tight_layout()
     plt.savefig(f'{save_fig_dir}/LossAdapt.pdf')

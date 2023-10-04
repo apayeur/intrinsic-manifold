@@ -970,6 +970,14 @@ class ToyNetwork:
             self.intercept = -self.V @ self.get_mean_activity()
         return all_losses
 
+    def mean_output_square_radius(self):
+        """Compute sum_k \pi_k E[|u|^2 | k]"""
+        V_given_ks = self.compute_conditioned_covariances()
+        mean_v_given_ks = self.get_conditioned_mean_activity()
+        R_square = 0
+        for k, p in enumerate(self.input_noise.p):
+            R_square += p * np.trace(self.V @ (V_given_ks[k] + np.outer(mean_v_given_ks[k],mean_v_given_ks[k])) @ self.V.T)
+        return R_square
     # -------------------------- Other functions -------------------------- #
     @staticmethod
     def dimensionality_(covariance_matrix, threshold=0.99):

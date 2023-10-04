@@ -4,10 +4,17 @@ Description:
 Plot the amount of covariability projected along the row space of D, denoted A.
 """
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import numpy as np
 from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
+mpl.rcParams['font.size'] = 7
+mpl.rcParams['axes.linewidth'] = 0.5
+mpl.rcParams['xtick.major.width'] = 0.5
+mpl.rcParams['ytick.major.width'] = 0.5
+
+output_fig_format = 'pdf'
 
 
 # Functions
@@ -21,8 +28,8 @@ def find_adaptation_time(loss, loss_fractions):
 
 
 # Loading data
-load_dir = "data/egd-high-dim-input/plasticity-in-U-and-W-final-M6-matching-params-NEW"
-save_fig_dir = "results/egd-high-dim-input/plasticity-in-U-and-W-final-M6-matching-params-NEW"
+load_dir = "data/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000"
+save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -68,8 +75,8 @@ for projection_type in ['D', 'DP_WM']:
     #plt.fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem,
     #                 color='black' if projection_type == 'D' else (0.9, 0.6, 0), alpha=0.5, lw=0)
 axes[1].set_xlabel('Percentage decrease in loss')
-axes[0].set_ylabel('Change in decoder-projected\ncovariability (%)')
-axes[1].set_ylabel('Change in decoder-projected\ncovariability (%)')
+axes[0].set_ylabel('Change in decoder-\nprojected covariability (%)')
+axes[1].set_ylabel('Change in decoder-\nprojected covariability (%)')
 
 for ax in axes:
     ax.set_xticks(100*np.array(loss_fractions))
@@ -78,5 +85,5 @@ for ax in axes:
     ax.set_yticks(np.arange(0, 810, 200))
 
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/Strategies.png')
+plt.savefig(f'{save_fig_dir}/Strategies.{output_fig_format}')
 plt.close()

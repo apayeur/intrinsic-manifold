@@ -13,9 +13,12 @@ import seaborn as sns
 plt.style.use('rnn4bci_plot_params.dms')
 
 mpl.rcParams['font.size'] = 7
+mpl.rcParams['axes.linewidth'] = 0.5
+mpl.rcParams['xtick.major.width'] = 0.5
+mpl.rcParams['ytick.major.width'] = 0.5
 
-load_dir = "data/egd/exponent_W0.55-lr0.001-M6"
-save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6"
+load_dir = "data/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000"
+save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -23,10 +26,11 @@ rel_proj_var_OM = np.load(f"{load_dir}/rel_proj_var_OM.npy")
 R = np.load(f"{load_dir}/R.npy")
 angles = np.load(f"{load_dir}/principal_angles_min.npy", allow_pickle=True).item()
 
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(114*units_convert['mm'], 114*units_convert['mm']/1.25), sharex=True)
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(100*units_convert['mm'], 100*units_convert['mm']/1.25), sharex=True)
 m = np.mean(R, axis=0)
 sem = np.std(R, axis=0, ddof=1) / R.shape[0]**0.5
 axes[0,0].plot(np.arange(len(m)), m, color=col_o)
+axes[0,0].set_xlim(0,500)
 axes[0,0].fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem, color=col_o, alpha=0.5, lw=0)
 #axes[0,0].set_yticks([0.04, 0.05, 0.06])
 axes[0,0].set_ylabel('Ratio of variance projected\nonto $CP_\mathsf{OM}$ and onto $C$')
