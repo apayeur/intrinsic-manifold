@@ -10,8 +10,8 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final-with-f-output"
-save_fig_dir = "results/egd/final-with-f-output"
+load_dir = "data/egd/exponent_W0.55-lr0.001-M6-iterAdapt500"
+save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6-iterAdapt500"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -27,7 +27,7 @@ for perturbation_type in ['WM', 'OM']:
     plt.fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem,
                      color=col_w if perturbation_type == 'WM' else col_o, alpha=0.5, lw=0)
 plt.xlabel('Weight update post-perturbation')
-plt.ylabel('Fraction of explained variance, $f$')
+plt.ylabel('Fraction of variance explained by $C$')
 plt.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/FractionExplainedVariance.png')

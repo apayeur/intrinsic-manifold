@@ -4,17 +4,12 @@ import numpy as np
 from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
-mpl.rcParams['font.size'] = 7
 
-exponents_W = [0.55, 0.6, 0.7, 0.8, 0.9, 1]
-mpl.rcParams['axes.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
-
+exponents_W = [0.55] # [0.55, 0.6, 0.7, 0.8, 0.9, 1]
 
 for exponent_W in exponents_W:
-    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt2000"
-    model_type = "egd" #"egd-high-dim-input"  #
+    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt1000"
+    model_type = "batch-sgd" #"egd-high-dim-input"  #
     #tag = "plasticity-in-W-only-M6-lrU0-lrW0.001"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -99,8 +94,12 @@ for exponent_W in exponents_W:
 
     # Plot mean +/- 2SEM adaptation loss
     plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
+    plot_relative_loss = False
     for perturbation_type in ['WM', 'OM']:
-        perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
+        if plot_relative_loss:
+            perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
+        else:
+            perf = loss[perturbation_type]
         m = np.mean(perf, axis=0)
         std = np.std(perf, axis=0, ddof=1)
         plt.plot(np.arange(m.shape[0]), m, label=perturbation_type,
@@ -109,16 +108,22 @@ for exponent_W in exponents_W:
                          m- 2*std/loss['WM'].shape[0]**0.5,
                          m + 2*std/loss['WM'].shape[0]**0.5,
                          color=col_w if perturbation_type=='WM' else col_o, lw=0, alpha=0.5)
-    plt.ylim([0,1])
-    plt.yticks([0,0.5,1])
+    if plot_relative_loss:
+        plt.ylim([0,1])
+        plt.yticks([0,0.5,1])
+        plt.ylabel('$L/L_0$')
+    else:
+        #plt.ylim([0, 0.5])
+        plt.yticks([0, 0.5])
+        plt.ylabel('Loss')
     #plt.xlim([0, len(m)])
     plt.xlim([0, 500])
     plt.xticks(plt.gca().get_xlim())
     plt.xlabel(x_label)
-    plt.ylabel('$L/L_0$')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'{save_fig_dir}/LossAdapt.pdf')
+    outfile_name = f'{save_fig_dir}/LossAdapt.{output_fig_format}' if not plot_relative_loss else f'{save_fig_dir}/LossAdaptRelative.{output_fig_format}'
+    plt.savefig(outfile_name)
     plt.close()
 
 

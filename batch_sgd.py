@@ -15,10 +15,10 @@ def main():
     intrinsic_manifold_dim = 6  # 6
     lr_init = (0, 1e-2, 0)
     lr_decoder = (0, 5e-3, 0)
-    lrs = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05]
+    lrs = [0.001] # , 0.002, 0.005, 0.01, 0.02, 0.05]
     nb_iter = int(5e2)  # int(1e3)
     nb_iter_adapt = int(1e3)  # was 5e3
-    seeds = np.arange(1, dtype=int)
+    seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
     exponents_W = [0.55] #[0.55, 0.6, 0.7, 0.8, 0.9]
@@ -28,9 +28,9 @@ def main():
         for lr in lrs:
             lr_adapt = (0, lr, 0)  # was lr/15
             # Manage save and load folders
-            tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-lrstudy"  # identification of this experiment, for bookkeeping
-            save_dir = f"data/egd/{tag}"
-            save_dir_results = f"results/egd/{tag}"
+            tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}"  # identification of this experiment, for bookkeeping
+            save_dir = f"data/batch-sgd/{tag}"
+            save_dir_results = f"results/batch-sgd/{tag}"
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             if not os.path.exists(save_dir_results):
@@ -120,7 +120,7 @@ def main():
                                   global_mean_input_is_zero=False,
                                   initialization_type='random', exponent_W=exponent_W,
                                   rng_seed=seed)
-                l, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+                l, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)  # pretrain with EGD
 
                 # compute max eigenvalue
                 eigval_init = np.max(np.abs(np.linalg.eigvals(net0.W)))
@@ -149,7 +149,7 @@ def main():
                 net2 = copy.deepcopy(net1)
                 net2.network_name = 'retrained_after_fitted'
                 if relearn_after_decoder_fitting:
-                    loss_decoder_retraining, _, _, _, _, _, _,_, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+                    loss_decoder_retraining, _, _, _, _, _, _,_, _ = net2.train_with_batch_sgd(lr=lr_decoder, nb_iter=nb_iter//10)
                     if seed_id == 0:
                         net2.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.{output_fig_format}")
 
@@ -170,7 +170,7 @@ def main():
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _ = net_wm.train_with_batch_sgd(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
@@ -212,7 +212,7 @@ def main():
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed = net_om.train_with_batch_sgd(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")

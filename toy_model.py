@@ -288,7 +288,6 @@ class ToyNetwork:
         Exps_given_k = self.get_conditioned_mean_activity()
         recast_op = np.linalg.inv(np.eye(self.network_size) - self.W.T) @ self.V.T
 
-
         grad = {'U': np.zeros_like(self.U), 'W': np.zeros_like(self.W), 'b': np.zeros_like(self.b)}
         for k, p in enumerate(self.input_noise.p):
             error_k = self.V @ Exps_given_k[k]-self.targets[k]
@@ -318,6 +317,28 @@ class ToyNetwork:
         for key in grad.keys():
             grad[key] = grad[key].T
         """
+        return grad
+
+    def compute_batch_gradient(self):
+        I = np.eye(self.network_size)
+        inv_I_minus_W = np.linalg.inv(I - self.W)
+        inv_I_minus_WT = np.linalg.inv(I - self.W.T)
+
+        X = self.input_noise.draw_each_component_once()
+        noise = self.private_noise.draw(size=self.nb_inputs)
+
+        grad = {'U': np.zeros_like(self.U), 'W': np.zeros_like(self.W)}
+
+        for k in range(self.nb_inputs):
+            v = inv_I_minus_W @ (self.U @ X[k] + noise[k])
+            u = self.V @ v + self.intercept
+
+            # Update gradients
+            grad['U'] += np.outer(self.V.T @ (u - self.targets[k]), X[k])
+            grad['W'] += np.outer(self.V.T @ (u - self.targets[k]), v)
+
+        grad['U'] = inv_I_minus_WT @ grad['U'] / self.nb_inputs
+        grad['W'] = inv_I_minus_WT @ grad['W'] * self.mask / self.nb_inputs
         return grad
 
     def compute_gradient_component(self, component_name):
@@ -606,11 +627,121 @@ class ToyNetwork:
             self.U -= lr[0] * g['U']
             self.W -= lr[1] * g['W'] * self.mask
             self.b -= lr[2] * g['b']
-            max_eig_valW = np.max(np.abs(np.linalg.eigvals(self.W)))
-            #if max_eig_valW > 1:
+            # max_eig_valW = np.max(np.abs(np.linalg.eigvals(self.W)))
+            # if max_eig_valW > 1:
             #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
             i += 1
         return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM
+
+    def train_with_batch_sgd(self, lr=(1e-3, 1.e-3, 1e-3), nb_iter=int(1e3), stopping_crit=None):
+        """Train network with batch GD instead of exact gradient descent."""
+        losses = {'total': [],  # total loss
+                  'var': [],    # loss component related to target-conditioned variances
+                  'exp': [],    # loss component related to error
+                  'corr': [],   # loss component related to total correlation
+                  'proj': [],   # loss component related to projection of conditioned output on target
+                  'vbar': []}   # loss subcomponent related to global mean
+        norm_gradW = {'loss': [], 'loss_tot_var': []}
+        max_angles = {'dVar_vs_VT': [],
+                      'UpperVar_vs_VT': [],
+                      'LowerVar_vs_VT': [],
+                      'UpperVar_vs_VarBCI': []}
+        min_angles = {'dVar_vs_VT': [],
+                      'UpperVar_vs_VT': [],
+                      'LowerVar_vs_VT': [],
+                      'UpperVar_vs_VarBCI': []}
+        normalized_variance_explained = []
+        R = []
+        A = {'D': [],
+             'DP_WM': []}
+        f = []
+        rel_proj_var_OM = []
+
+        if self.D is not None:
+            d = self.D.shape[1]
+
+        Var_init = self.compute_total_covariance()
+
+        if stopping_crit is not None:
+            nb_iter = 0
+        else:
+            stopping_crit = 1e6
+
+        # Learning
+        i = 0
+        loss = 1e9
+        while i < int(nb_iter) or loss > stopping_crit:
+            # Compute loss and loss components
+            loss_var, loss_exp = self.loss_function_components()
+            losses['var'].append(loss_var)
+            losses['exp'].append(loss_exp)
+            losses['total'].append(loss_var + loss_exp)
+            loss_corr, loss_proj = self.loss_components_correlation_and_projection()
+            losses['corr'].append(loss_corr)
+            losses['proj'].append(loss_proj)
+            losses['vbar'].append(0.5*np.linalg.norm(self.V @ self.get_mean_activity())**2)
+            loss = loss_var + loss_exp
+
+            if nb_iter == 0:
+                if i % 500 == 0:
+                    print(f"Loss at iteration {i} = {loss}")
+            elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
+                print(f"Loss at iteration {i} = {loss} | floor ratio = {self.floor_loss() / loss}")
+
+            # Compute gradient
+            g = self.compute_batch_gradient()
+
+            if self.C is not None:
+                # Compute norm of the gradient
+                norm_gradW['loss'].append(np.linalg.norm(g['W']))
+                norm_gradW['loss_tot_var'].append(np.linalg.norm(self.compute_gradient_component('loss_tot_var')))
+
+                # Compute angles
+                dVar = self.compute_dVar(-lr[1] * g['W'] * self.mask, -lr[0] * g['U'])
+                Var = self.compute_total_covariance()
+                U_Var, _, VT_Var = np.linalg.svd(Var)
+                upper_var = U_Var[:, :d]
+                lower_var = U_Var[:, d:]
+
+                max_angles['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[0]))
+                max_angles['UpperVar_vs_VT'].append(np.rad2deg(subspace_angles(upper_var, self.V.T)[0]))
+                max_angles['LowerVar_vs_VT'].append(np.rad2deg(subspace_angles(lower_var, self.V.T)[0]))
+                max_angles['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.C.T)[0]))
+
+                min_angles['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[-1]))
+                min_angles['UpperVar_vs_VT'].append(np.rad2deg(subspace_angles(upper_var, self.V.T)[-1]))
+                min_angles['LowerVar_vs_VT'].append(np.rad2deg(subspace_angles(lower_var, self.V.T)[-1]))
+                min_angles['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.C.T)[-1]))
+
+                # Compute manifold overlap (as per Feulner and Clopath)
+                beta1 = np.trace(self.C @ Var_init @ self.C.T) / np.trace(Var_init)
+                beta2 = np.trace(self.C @ Var @ self.C.T) / np.trace(Var)  # note that self.C is never reassigned, so it stays at its initial value
+                normalized_variance_explained.append(beta2 / beta1)
+                f.append(beta2)
+
+                if self.selected_permutation_OM is not None:
+                    tmp1 = np.trace(self.C[:, self.selected_permutation_OM] @ Var
+                                    @ self.C[:, self.selected_permutation_OM].T)
+                    tmp2 = np.trace(self.C @ Var @ self.C.T)
+                    R.append(tmp1/tmp2)
+                    rel_proj_var_OM.append(tmp1 / np.trace(self.C[:, self.selected_permutation_OM] @ Var_init
+                                    @ self.C[:, self.selected_permutation_OM].T))
+
+                if self.selected_permutation_WM is not None:
+                    _, _, VDT = np.linalg.svd(self.D)
+                    _, _, VDT_WM = np.linalg.svd(self.D[:, self.selected_permutation_WM])
+                    A['D'].append(np.trace(VDT[:2] @ self.C @ Var @ self.C.T @ VDT[:2].T))
+                    A['DP_WM'].append(np.trace(VDT_WM[:2] @ self.C @ Var @ self.C.T @ VDT_WM[:2].T))
+
+            # Parameter update
+            self.U -= lr[0] * g['U']
+            self.W -= lr[1] * g['W'] * self.mask
+            # max_eig_valW = np.max(np.abs(np.linalg.eigvals(self.W)))
+            # if max_eig_valW > 1:
+            #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
+            i += 1
+        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM
+
 
     # -------------------------- Functions related to statistics of the network -------------------------- #
     def compute_covariance(self):
