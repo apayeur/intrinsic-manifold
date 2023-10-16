@@ -180,13 +180,17 @@ class ToyNetwork:
             U = np.zeros(shape=(self.network_size, self.input_size))
             W = np.zeros(shape=(self.network_size, self.network_size))
         elif isinstance(type_, int):
-            U = np.zeros(shape=(self.network_size, self.input_size))
+            #U = np.zeros(shape=(self.network_size, self.input_size))
+            if self.nb_inputs == self.input_size and self.input_noise_intensity < 1e-6:
+                U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
+            else:
+                U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size ** 0.5
             W = np.zeros(shape=(self.network_size, self.network_size))
             for i in range(type_):
                 W += np.outer(self.rng.standard_normal(size=self.network_size) / self.network_size ** 0.5,
                               self.rng.standard_normal(size=self.network_size) / self.network_size ** 0.5)
-                U += np.outer(self.rng.standard_normal(size=self.network_size) / self.network_size ** 0.5,
-                              self.rng.standard_normal(size=self.input_size) / self.input_size ** 0.5)
+                #U += np.outer(self.rng.standard_normal(size=self.network_size) / self.network_size ** 0.5,
+                #              self.rng.standard_normal(size=self.input_size) / self.input_size ** 0.5)
         if self.nb_inputs == self.input_size and self.input_noise_intensity < 1e-6:
             V = self.rng.standard_normal(size=(2, self.network_size))
             initial_decoder_fac = 0.2
