@@ -5,12 +5,9 @@ from utils import units_convert, col_o, col_w
 import os
 from scipy.stats import linregress
 plt.style.use('rnn4bci_plot_params.dms')
-mpl.rcParams['font.size'] = 7
-mpl.rcParams['axes.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
 
-output_fig_format = 'pdf'
+
+output_fig_format = 'png'
 
 load_dir_prefix = "data/egd/exponent_W"
 load_dir_suffix = "-lr0.001-M6-iterAdapt2000"

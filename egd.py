@@ -15,10 +15,10 @@ def main():
     intrinsic_manifold_dim = 6  # 6
     lr_init = (0, 1e-2, 0)
     lr_decoder = (0, 5e-3, 0)
-    lrs = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05]
+    lrs = [0.001] #, 0.002, 0.005, 0.01, 0.02, 0.05]
     nb_iter = int(5e2)  # int(1e3)
-    nb_iter_adapt = int(1e3)  # was 5e3
-    seeds = np.arange(1, dtype=int)
+    nb_iter_adapt = int(2e3)  # was 5e3
+    seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
     exponents_W = [0.55] #[0.55, 0.6, 0.7, 0.8, 0.9]
@@ -28,7 +28,7 @@ def main():
         for lr in lrs:
             lr_adapt = (0, lr, 0)  # was lr/15
             # Manage save and load folders
-            tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-lrstudy"  # identification of this experiment, for bookkeeping
+            tag = f"exponent_Winfinity-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}"  # identification of this experiment, for bookkeeping
             save_dir = f"data/egd/{tag}"
             save_dir_results = f"results/egd/{tag}"
             if not os.path.exists(save_dir):
@@ -118,7 +118,7 @@ def main():
                                   input_subspace_dim=0, nb_inputs=size[0],
                                   use_data_for_decoding=False,
                                   global_mean_input_is_zero=False,
-                                  initialization_type='random', exponent_W=exponent_W,
+                                  initialization_type='W-zero', exponent_W=exponent_W,
                                   rng_seed=seed)
                 l, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
 
