@@ -540,6 +540,7 @@ class ToyNetwork:
              'DP_WM': []}
         f = []
         rel_proj_var_OM = []
+        max_eigvalsW = []
 
         if self.D is not None:
             d = self.D.shape[1]
@@ -574,6 +575,8 @@ class ToyNetwork:
 
             # Compute gradient
             g = self.compute_gradient()
+
+            max_eigvalsW.append(np.max(np.abs(np.linalg.eigvals(self.W))))
 
             if self.C is not None:
                 # Compute norm of the gradient
@@ -631,7 +634,7 @@ class ToyNetwork:
             # if max_eig_valW > 1:
             #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
             i += 1
-        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM
+        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM, max_eigvalsW
 
     def train_with_batch_sgd(self, lr=(1e-3, 1.e-3, 1e-3), nb_iter=int(1e3), stopping_crit=None):
         """Train network with batch GD instead of exact gradient descent."""

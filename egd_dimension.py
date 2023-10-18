@@ -5,12 +5,9 @@ from utils import units_convert, col_o, col_w
 import os
 from scipy.stats import linregress
 plt.style.use('rnn4bci_plot_params.dms')
-mpl.rcParams['font.size'] = 7
-mpl.rcParams['axes.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
 
-output_fig_format = 'pdf'
+
+output_fig_format = 'png'
 
 load_dir_prefix = "data/egd/exponent_W"
 load_dir_suffix = "-lr0.001-M6-iterAdapt2000"
@@ -57,36 +54,40 @@ for expo in exponent_Ws:
 
 
 # Plot max sum_diff vs manifold dimension
-fig, axes = plt.subplots(ncols=2, figsize=(2*45*units_convert['mm'], 36*units_convert['mm']))
+plt.figure( figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 min_, max_ = 100, 0
 min_diff = 10
 x, y = [], []
 for expo in exponent_Ws:
     x += list(dims[expo]['initial'])
     y += list(sum_diff[expo])
-    axes[0].plot(dims[expo]['initial'], sum_diff[expo], lw=0, marker='o', markersize=2.5, mec='white', mew=0.3, color='k')
+    plt.plot(dims[expo]['initial'], sum_diff[expo], lw=0, marker='o', markersize=2.5, mec='white', mew=0.3, color='k')
     min_ = min(dims[expo]['initial']) if min_ > min(dims[expo]['initial']) else min_
     max_ = max(dims[expo]['initial']) if max_ < max(dims[expo]['initial']) else max_
     min_diff = min(sum_diff[expo]) if min_diff > min(sum_diff[expo]) else min_diff
 r = linregress(x, y, alternative='less')
-axes[0].fill_between([min_, max_], [min_diff, min_diff], [0,0], color='grey', zorder=-1, alpha=0.3, lw=0)
+plt.fill_between([min_, max_], [min_diff, min_diff], [0,0], color='grey', zorder=-1, alpha=0.3, lw=0)
 #axes[0].plot([min_, max_], [r.slope*min_+r.intercept, r.slope*max_+r.intercept], color='black')
 #axes[0].text(0.05, 0.1, f"p = {r.pvalue:.1}", ha='left', transform=axes[0].transAxes, fontsize=5)
 #axes[0].text(0.05, 0.3, f"R$^2$ = {r.rvalue**2:.2}", ha='left', va='top', transform=axes[0].transAxes, fontsize=5)
 #axes[0].plot([min_, max_], [0, 0], ':', color='grey', zorder=-1)
 #axes[0].set_yticks([0., 0.1])
-axes[0].set_xlabel('Manifold dimension\nbefore adaptation')
-axes[0].set_ylabel(r'Average $\frac{L^{(\mathsf{OM})}}{L^{(\mathsf{OM})}_0} - \frac{L^{(\mathsf{WM})}}{L^{(\mathsf{WM})}_0}$') #\n(normalized)')
+plt.xlabel('Manifold dimension\nbefore adaptation')
+plt.ylabel(r'Average $\frac{L^{(\mathsf{OM})}}{L^{(\mathsf{OM})}_0} - \frac{L^{(\mathsf{WM})}}{L^{(\mathsf{WM})}_0}$') #\n(normalized)')
+plt.tight_layout()
+plt.savefig(f'{save_fig_dir}/AvgDiff_vs_ManifoldDimension.{output_fig_format}')
+plt.close()
 
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 # Plot dim vs max_eigval intuit
 for expo in exponent_Ws:
-    axes[1].plot(max_eigvals[expo]['W_intuit'], dims[expo]['initial'],
+    plt.plot(max_eigvals[expo]['W_intuit'], dims[expo]['initial'],
              lw=0, marker='o', markersize=2.5, mec='white', mew=0.3, color='k')
-axes[1].set_xlabel('Max eigenvalue $W$\nbefore adaptation')
-axes[1].set_ylabel('Manifold dimension\nbefore adaptation')
+plt.xlabel('Max eigenvalue $W$\nbefore adaptation')
+plt.ylabel('Manifold dimension\nbefore adaptation')
 #plt.yticks([0.5, 1])
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/ManifoldDimension.{output_fig_format}')
+plt.savefig(f'{save_fig_dir}/ManifoldDimension_vs_MaxEigval.{output_fig_format}')
 plt.close()
 
 # Plot dim Wm and Om vs dim initial

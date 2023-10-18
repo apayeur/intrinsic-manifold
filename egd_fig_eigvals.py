@@ -5,10 +5,7 @@ from utils import units_convert, col_o, col_w
 import os
 from scipy.stats import linregress
 plt.style.use('rnn4bci_plot_params.dms')
-mpl.rcParams['font.size'] = 7
-mpl.rcParams['axes.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
+
 
 from seaborn import despine
 output_fig_format = 'pdf'
@@ -48,7 +45,7 @@ for expo in exponent_Ws:
         sum_diff[expo].append(np.sum(d) / len(indices))
 
 # Plot max sum_diff vs manifold dimension
-plt.figure(figsize=(45*units_convert['mm'], 36*units_convert['mm']))
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 min_, max_ = 100, 0
 x, y = [], []
 for expo in exponent_Ws:
@@ -70,7 +67,7 @@ plt.savefig(f'{save_fig_dir}/SumDiff_Vs_ManifoldDimension.{output_fig_format}')
 plt.close()
 
 # Plot max sum_diff vs W_intuit
-plt.figure(figsize=(45*units_convert['mm'], 36*units_convert['mm']))
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 min_, max_ = 1, 0
 x, y = [], []
 for expo in exponent_Ws:
@@ -93,7 +90,7 @@ plt.close()
 
 
 # Plot max_eig WM and OM vs max_eigval intuit
-plt.figure(figsize=(45*units_convert['mm'], 36*units_convert['mm']))
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 plt.gca().set_aspect('equal')
 for expo in exponent_Ws:
     for perturbation_type in ['WM', 'OM']:
@@ -109,7 +106,7 @@ plt.savefig(f'{save_fig_dir}/MaxEigVal.{output_fig_format}')
 plt.close()
 
 # Plot max_eig WM and OM vs max_eigval intuit
-plt.figure(figsize=(45*units_convert['mm'], 36*units_convert['mm']))
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 change_max_eigvals = {'WM': [], 'OM':[]}
 for i, expo in enumerate(exponent_Ws):
     load_dir = f"{load_dir_prefix}{expo}{load_dir_suffix}"
