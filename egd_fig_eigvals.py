@@ -38,7 +38,6 @@ for expo in exponent_Ws:
         losses[expo][perturbation_type] = loss[perturbation_type] / loss[perturbation_type][:, 0:1]
 
     nb_seeds = len(max_eigvals[expo]['W_intuit'])
-    print(losses[expo]['OM'].shape)
     for seed_i in range(nb_seeds):
         indices = losses[expo]['OM'][seed_i, :] > threshold
         d = losses[expo]['OM'][seed_i, indices] - losses[expo]['WM'][seed_i, indices]
@@ -108,19 +107,22 @@ plt.close()
 # Plot max_eig WM and OM vs max_eigval intuit
 plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 change_max_eigvals = {'WM': [], 'OM':[]}
+relative_max_eigvals = []
 for i, expo in enumerate(exponent_Ws):
     load_dir = f"{load_dir_prefix}{expo}{load_dir_suffix}"
     max_eigvals[expo]['W_intuit'] = np.load(f"{load_dir}/eigenvals_init.npy")
 
+    relative_max_eigvals += list((max_eigvals[expo][f'W_OM'] - max_eigvals[expo][f'W_WM']))
+
     for perturbation_type in ['WM', 'OM']:
         max_eigvals[expo][f'W_{perturbation_type}'] = np.load(f"{load_dir}/eigenvals_after_{perturbation_type}P.npy")
-        change_max_eigvals[perturbation_type] += list(max_eigvals[expo][f'W_{perturbation_type}'] - max_eigvals[expo]['W_intuit'])
+        change_max_eigvals[perturbation_type] += list((max_eigvals[expo][f'W_{perturbation_type}'] - max_eigvals[expo]['W_intuit']))
 
-for perturbation_type in ['WM', 'OM']:
-    plt.hist(change_max_eigvals[perturbation_type], bins='auto',
-             label=perturbation_type, color=col_w if perturbation_type=='WM' else col_o, alpha=0.5)
-
-plt.xlabel('Change in max eigenvalue')
+plt.hist(relative_max_eigvals, bins='auto', color ='k', rwidth=0.9)
+#for perturbation_type in ['WM', 'OM']:
+#    plt.hist(change_max_eigvals[perturbation_type], bins='auto', cumulative=True, histtype='stepfilled', density=True,
+#             label=perturbation_type, color=col_w if perturbation_type=='WM' else col_o, alpha=0.5)
+plt.xlabel('Difference in max eigenvalue\nafter adapt. (OM $-$ WM)')
 plt.ylabel('Count')
 #plt.yticks([0.5, 1])
 plt.legend()

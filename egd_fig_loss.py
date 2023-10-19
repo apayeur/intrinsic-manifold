@@ -5,24 +5,23 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55] # [0.55, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.55, 0.6, 0.7, 0.8, 0.9, 1]
+diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
+output_fig_format = 'png'
+load_dir_suffix = "-lr0.001-M6-iterAdapt2000"
 
 for exponent_W in exponents_W:
-    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt1000"
-    model_type = "batch-sgd" #"egd-high-dim-input"  #
+    tag = f"exponent_W{exponent_W}{load_dir_suffix}"
+    model_type = "egd" #"egd-high-dim-input"  #
     #tag = "plasticity-in-W-only-M6-lrU0-lrW0.001"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
     if not os.path.exists(save_fig_dir):
         os.makedirs(save_fig_dir)
 
-    output_fig_format = 'png'
-
     # Exclude seed if max eigenvalue of W becomes unstable (> 1)
     max_eigvals = {'W_WM': np.load(f"{load_dir}/eigenvals_after_WMP.npy"),
                    'W_OM': np.load(f"{load_dir}/eigenvals_after_OMP.npy")}
-    for perturbation_type in ['WM', 'OM']:
-        print(max_eigvals[f"W_{perturbation_type}"])
     seeds_to_exclude = np.where(max_eigvals['W_OM'] > 1)[0]
     nb_unstable_seed_WM = len(np.where(max_eigvals['W_WM'] > 1)[0])
     print("Nb of unstable seeds WM", nb_unstable_seed_WM)
@@ -56,6 +55,7 @@ for exponent_W in exponents_W:
     x_label = 'Weight update post-perturb.' if 'egd' in load_dir else 'Epoch'
 
     # ------------------------ Loss-related figures ------------------------ #
+    diff_relative_loss[exponent_W] = loss['OM'] / loss['OM'][:, 0:1] - loss['WM'] / loss['WM'][:, 0:1]
     # Plot initial loss
     plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
     for l in loss_init:
@@ -83,7 +83,7 @@ for exponent_W in exponents_W:
     plt.xlabel(x_label)
     plt.ylabel('$L/L_0$')
     #plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
-    plt.xlim([0, 500])
+    #plt.xlim([0, 500])
     plt.xticks(plt.gca().get_xlim())
     plt.ylim([0,1])
     plt.yticks([0,0.5,1])
@@ -94,7 +94,7 @@ for exponent_W in exponents_W:
 
     # Plot mean +/- 2SEM adaptation loss
     plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
-    plot_relative_loss = False
+    plot_relative_loss = True
     for perturbation_type in ['WM', 'OM']:
         if plot_relative_loss:
             perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
@@ -117,8 +117,8 @@ for exponent_W in exponents_W:
         plt.yticks([0, 0.5])
         plt.ylabel('Loss')
     #plt.xlim([0, len(m)])
-    plt.xlim([0, 500])
-    plt.xticks(plt.gca().get_xlim())
+    #plt.xlim([0, 500])
+    #plt.xticks(plt.gca().get_xlim())
     plt.xlabel(x_label)
     plt.legend()
     plt.tight_layout()
@@ -281,4 +281,27 @@ for exponent_W in exponents_W:
     plt.savefig(f'{save_fig_dir}/Loss_TotalVariance.{output_fig_format}')
     plt.close()
 
-
+# plot L^{OM}/L_0^{OM}/L^{WM}/L_0^{WM}
+save_fig_dir = f"results/egd/eigvals-study{load_dir_suffix}"
+if not os.path.exists(save_fig_dir):
+    os.makedirs(save_fig_dir)
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2*units_convert['mm']/1.25))
+colors = ['black', 'orange', 'green', 'pink']
+i = 0
+for exponent_W in exponents_W:
+    #if exponent_W not in [0.8, 0.9]:
+    m = np.mean(diff_relative_loss[exponent_W], axis=0)
+    sem = np.std(diff_relative_loss[exponent_W], axis=0, ddof=1) / diff_relative_loss[exponent_W].shape[0]**0.5
+    plt.plot(np.arange(m.shape[0]), m, label=rf"$\alpha$ = {exponent_W}")
+    plt.fill_between(np.arange(m.shape[0]), m - 2*sem,  m + 2*sem, lw=0, alpha=0.5)
+    i += 1
+plt.plot(np.arange(m.shape[0]), 0*np.arange(m.shape[0]), ":", color='grey')
+#plt.ylabel(r'$L^{(\mathsf{OM})}/L^{(\mathsf{OM})}_0 - L^{(\mathsf{WM})}/L^{(\mathsf{WM})}_0$') #\n(normalized)')
+plt.ylabel("Difference of normalized\nlosses (OM $-$ WM)") #\n(normalized)')
+plt.xticks([0, 1000, 2000])
+plt.xlabel(x_label)
+plt.xlim([0, 2000])
+plt.legend()
+plt.tight_layout()
+plt.savefig(f'{save_fig_dir}/DiffLoss.{output_fig_format}')
+plt.close()
