@@ -9,18 +9,12 @@ import numpy as np
 from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
-mpl.rcParams['font.size'] = 7
-
-mpl.rcParams['axes.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
-
 
 lrs = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05]
 fraction_unstable_seeds = {'WM': [], 'OM': []}
 fraction_irregular_stable_seeds = {'WM': [], 'OM': []}
 
-output_fig_format = 'pdf'
+output_fig_format = 'png'
 model_type = "egd"
 tag = "exponent_W0.55-M6-iterAdapt1000-lrstudy"
 save_fig_dir = f"results/{model_type}/{tag}"
@@ -38,8 +32,8 @@ for lr in lrs:
     loss = loss_dict['loss']
 
     for perturbation_type in ['WM', 'OM']:
-        # Proportion of unstable seeds
-        nb_seeds = len(max_eigvals[perturbation_type])
+        # Pr oportion of unstable seeds
+        nb_seeds = loss[perturbation_type].shape[0]
         unstable_seeds = np.where(max_eigvals[perturbation_type] > 1)[0]
         nb_stable_seeds = nb_seeds - len(unstable_seeds)
         fraction_unstable_seeds[perturbation_type].append(len(unstable_seeds) / nb_seeds)
@@ -55,7 +49,7 @@ for lr in lrs:
         fraction_irregular_stable_seeds[perturbation_type].append((nb_stable_irregular_seeds + len(unstable_seeds)) / nb_seeds)
 
 # Plotting
-fig, axes = plt.subplots(ncols=2, figsize=(2*45*units_convert['mm'], 36*units_convert['mm']), sharex=True, sharey=True)
+fig, axes = plt.subplots(ncols=2, figsize=(85*units_convert['mm'], 85/2/1.25*units_convert['mm']), sharex=True, sharey=True)
 
 # proportion of unstable seeds
 for perturbation_type in ['WM', 'OM']:
