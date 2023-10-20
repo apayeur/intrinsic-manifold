@@ -540,6 +540,7 @@ class ToyNetwork:
              'DP_WM': []}
         f = []
         rel_proj_var_OM = []
+        pr = []
 
         if self.D is not None:
             d = self.D.shape[1]
@@ -565,6 +566,7 @@ class ToyNetwork:
             losses['proj'].append(loss_proj)
             losses['vbar'].append(0.5*np.linalg.norm(self.V @ self.get_mean_activity())**2)
             loss = loss_var + loss_exp
+            pr.append(self.participation_ratio())
 
             if nb_iter == 0:
                 if i % 500 == 0:
@@ -631,7 +633,7 @@ class ToyNetwork:
             # if max_eig_valW > 1:
             #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
             i += 1
-        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM
+        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM, pr
 
     def train_with_batch_sgd(self, lr=(1e-3, 1.e-3, 1e-3), nb_iter=int(1e3), stopping_crit=None):
         """Train network with batch GD instead of exact gradient descent."""
