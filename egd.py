@@ -17,11 +17,11 @@ def main():
     lr_decoder = (0, 5e-3, 0)
     lrs = [0.001] #, 0.002, 0.005, 0.01, 0.02, 0.05]
     nb_iter = int(5e2)  # int(1e3)
-    nb_iter_adapt = int(5e2)  # was 5e3
+    nb_iter_adapt = int(2e3)  # was 5e3
     seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
-    exponents_W = [0.55] #[0.55, 0.6, 0.7, 0.8, 0.9]
+    exponents_W = [1] #[0.55, 0.6, 0.7, 0.8, 0.9]
     do_scale_V_OM = False
 
     for exponent_W in exponents_W:
@@ -124,7 +124,7 @@ def main():
                 # compute max eigenvalue
                 eigenvals_0.append(np.max(np.abs(np.linalg.eigvals(net0.W))))
                 l, _, _, _, _, _, _, _, _, p_ratio['initial'][seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
-
+                print(p_ratio['initial'][seed_id][0], p_ratio['initial'][seed_id][-1])
                 # compute max eigenvalue
                 eigval_init = np.max(np.abs(np.linalg.eigvals(net0.W)))
                 print(f"Max eigenvalue of W: {eigval_init}")
@@ -177,6 +177,7 @@ def main():
 
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
+                print(p_ratio['WM'][seed_id][0], p_ratio['WM'][seed_id][-1])
 
                 loss['WM'][seed_id] = l['total']
                 loss_var['WM'][seed_id] = l['var']
@@ -200,7 +201,7 @@ def main():
                 print(f"Max eigenvalue of W: {eigval_after_WM}")
                 eigenvals_after_WMP.append(eigval_after_WM)
 
-                p_ratio['WM'][seed_id] = net_wm.participation_ratio()
+                #p_ratio['WM'][seed_id] = net_wm.participation_ratio()
 
                 print('\n|-------------------------------- OM perturbation --------------------------------|')
                 net_om = copy.deepcopy(net2)
@@ -220,6 +221,7 @@ def main():
 
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")
+                print(p_ratio['OM'][seed_id][0], p_ratio['OM'][seed_id][-1])
 
                 loss['OM'][seed_id] = l['total']
                 loss_var['OM'][seed_id] = l['var']
@@ -241,7 +243,7 @@ def main():
                 print(f"Max eigenvalue of W: {eigval_after_OM}")
                 eigenvals_after_OMP.append(eigval_after_OM)
 
-                p_ratio['OM'][seed_id] = net_om.participation_ratio()
+                #p_ratio['OM'][seed_id] = net_om.participation_ratio()
 
             # Save parameters
             param_dict = {'size': size,
