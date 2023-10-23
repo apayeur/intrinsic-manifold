@@ -289,12 +289,12 @@ plt.figure(figsize=(85/2*units_convert['mm'], 85/2*units_convert['mm']/1.25))
 colors = ['black', 'orange', 'green', 'pink']
 i = 0
 for exponent_W in exponents_W:
-    #if exponent_W not in [0.8, 0.9]:
-    m = np.mean(diff_relative_loss[exponent_W], axis=0)
-    sem = np.std(diff_relative_loss[exponent_W], axis=0, ddof=1) / diff_relative_loss[exponent_W].shape[0]**0.5
-    plt.plot(np.arange(m.shape[0]), m, label=rf"$\alpha$ = {exponent_W}")
-    plt.fill_between(np.arange(m.shape[0]), m - 2*sem,  m + 2*sem, lw=0, alpha=0.5)
-    i += 1
+    if exponent_W not in [0.6, 0.8, 0.9]:
+        m = np.mean(diff_relative_loss[exponent_W], axis=0)
+        sem = np.std(diff_relative_loss[exponent_W], axis=0, ddof=1) / diff_relative_loss[exponent_W].shape[0]**0.5
+        plt.plot(np.arange(m.shape[0]), m, color=colors[i], label=rf"$\alpha$ = {exponent_W}")
+        plt.fill_between(np.arange(m.shape[0]), m - 2*sem,  m + 2*sem, color=colors[i], lw=0, alpha=0.5)
+        i += 1
 plt.plot(np.arange(m.shape[0]), 0*np.arange(m.shape[0]), ":", color='grey')
 #plt.ylabel(r'$L^{(\mathsf{OM})}/L^{(\mathsf{OM})}_0 - L^{(\mathsf{WM})}/L^{(\mathsf{WM})}_0$') #\n(normalized)')
 plt.ylabel("Difference of normalized\nlosses (OM $-$ WM)") #\n(normalized)')
