@@ -5,11 +5,11 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55] # [0.55, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.6] # [0.55, 0.6, 0.7, 0.8, 0.9, 1]
 
 for exponent_W in exponents_W:
-    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt1000"
-    model_type = "batch-sgd" #"egd-high-dim-input"  #
+    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt1000-TMP"
+    model_type = "egd" #"egd-high-dim-input"  #
     #tag = "plasticity-in-W-only-M6-lrU0-lrW0.001"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -83,8 +83,8 @@ for exponent_W in exponents_W:
     plt.xlabel(x_label)
     plt.ylabel('$L/L_0$')
     #plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
-    plt.xlim([0, 500])
-    plt.xticks(plt.gca().get_xlim())
+    #plt.xlim([0, 500])
+    #plt.xticks(plt.gca().get_xlim())
     plt.ylim([0,1])
     plt.yticks([0,0.5,1])
     plt.legend(loc='upper right')

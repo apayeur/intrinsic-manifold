@@ -49,28 +49,35 @@ for lr in lrs:
         fraction_irregular_stable_seeds[perturbation_type].append((nb_stable_irregular_seeds + len(unstable_seeds)) / nb_seeds)
 
 # Plotting
-fig, axes = plt.subplots(ncols=2, figsize=(85*units_convert['mm'], 85/2/1.25*units_convert['mm']), sharex=True, sharey=True)
+fig, ax = plt.subplots(ncols=1, figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 
 # proportion of unstable seeds
 for perturbation_type in ['WM', 'OM']:
-    axes[0].plot(lrs, fraction_unstable_seeds[perturbation_type], label=perturbation_type,
+    ax.plot(lrs, fraction_unstable_seeds[perturbation_type], label=perturbation_type,
                  marker='o' if perturbation_type=='WM' else 's', markersize=2.5, mew=0.3, mec='white',
                  color=col_w if perturbation_type=='WM' else col_o)
-axes[0].set_xlabel('Learning rate')
-axes[0].set_ylabel('Proportion of\nunstable seeds')
-axes[0].set_xticks(lrs[3:])
-axes[0].set_ylim([-0.05, 1.05])
-axes[0].set_yticks([0, 0.5, 1])
-axes[0].legend()
+ax.set_xlabel('Learning rate')
+ax.set_ylabel('Proportion of\nunstable seeds')
+ax.set_xticks(lrs[3:])
+ax.set_ylim([-0.05, 1.05])
+ax.set_yticks([0, 0.5, 1])
+ax.legend()
+plt.tight_layout()
+plt.savefig(f'{save_fig_dir}/ProportionUnstableSeeds.{output_fig_format}')
 
+fig, ax = plt.subplots(ncols=1, figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 # proportion of irregular stable seeds
 for perturbation_type in ['WM', 'OM']:
-    axes[1].plot(lrs, fraction_irregular_stable_seeds[perturbation_type], label=perturbation_type,
+    ax.plot(lrs, fraction_irregular_stable_seeds[perturbation_type], label=perturbation_type,
                  marker='o' if perturbation_type == 'WM' else 's', markersize=2.5, mew=0.3, mec='white',
                  color=col_w if perturbation_type=='WM' else col_o)
-axes[1].set_xlabel('Learning rate')
-axes[1].set_ylabel('Proportion of\nirregular seeds')
-
+ax.set_xticks(lrs[3:])
+ax.set_ylim([-0.05, 1.05])
+ax.set_yticks([0, 0.5, 1])
+ax.legend()
+ax.set_xlabel('Learning rate')
+ax.set_ylabel('Proportion of\nirregular seeds')
 plt.tight_layout()
-plt.savefig(f'{save_fig_dir}/UnstableSeeds.{output_fig_format}')
+plt.savefig(f'{save_fig_dir}/ProportionIrregularSeeds.{output_fig_format}')
+
 

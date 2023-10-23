@@ -21,7 +21,7 @@ def main():
     seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
-    exponents_W = [1] #[0.55, 0.6, 0.7, 0.8, 0.9]
+    exponents_W = [0.55] #[0.55, 0.6, 0.7, 0.8, 0.9]
     do_scale_V_OM = False
 
     for exponent_W in exponents_W:
@@ -110,6 +110,12 @@ def main():
                        'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
                        'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
 
+            total_change_W_Fnorm = {'WM': [], 'OM': []}
+
+            follow_eigvals = {'initial': np.empty(shape=(len(seeds), nb_iter, size[1]), dtype=complex),
+                              'WM': np.empty(shape=(len(seeds), nb_iter_adapt, size[1]), dtype=complex),
+                              'OM': np.empty(shape=(len(seeds), nb_iter_adapt, size[1]), dtype=complex)}
+
             for seed_id, seed in enumerate(seeds):
                 print(f'\n|==================================== Seed {seed} =====================================|')
                 print('\n|-------------------------------- Initial training --------------------------------|')
@@ -123,15 +129,12 @@ def main():
                                   rng_seed=seed)
                 # compute max eigenvalue
                 eigenvals_0.append(np.max(np.abs(np.linalg.eigvals(net0.W))))
-                l, _, _, _, _, _, _, _, _, p_ratio['initial'][seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
+                l, _, _, _, _, _, _, _, _, p_ratio['initial'][seed_id], follow_eigvals['initial'][seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
                 print(p_ratio['initial'][seed_id][0], p_ratio['initial'][seed_id][-1])
                 # compute max eigenvalue
                 eigval_init = np.max(np.abs(np.linalg.eigvals(net0.W)))
                 print(f"Max eigenvalue of W: {eigval_init}")
                 eigenvals_init.append(eigval_init)
-
-                # compute participation ratio
-                p_ratio['initial'][seed_id] = net0.participation_ratio()
 
                 # save loss
                 loss_init[seed_id] = l['total']
@@ -173,7 +176,7 @@ def main():
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, p_ratio['WM'][seed_id] = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, p_ratio['WM'][seed_id], follow_eigvals['WM'][seed_id] = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
@@ -201,8 +204,6 @@ def main():
                 print(f"Max eigenvalue of W: {eigval_after_WM}")
                 eigenvals_after_WMP.append(eigval_after_WM)
 
-                #p_ratio['WM'][seed_id] = net_wm.participation_ratio()
-
                 print('\n|-------------------------------- OM perturbation --------------------------------|')
                 net_om = copy.deepcopy(net2)
                 net_om.network_name = 'om'
@@ -216,7 +217,7 @@ def main():
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, p_ratio['OM'][seed_id] \
+                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, p_ratio['OM'][seed_id], follow_eigvals['OM'][seed_id] \
                     = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
@@ -243,7 +244,8 @@ def main():
                 print(f"Max eigenvalue of W: {eigval_after_OM}")
                 eigenvals_after_OMP.append(eigval_after_OM)
 
-                #p_ratio['OM'][seed_id] = net_om.participation_ratio()
+                total_change_W_Fnorm['WM'].append(np.linalg.norm(net_wm.W - net0.W))
+                total_change_W_Fnorm['OM'].append(np.linalg.norm(net_om.W - net0.W))
 
             # Save parameters
             param_dict = {'size': size,
@@ -312,6 +314,12 @@ def main():
 
             # Save participation ratios
             np.save(f"{save_dir}/participation_ratio_during_training", p_ratio)
+
+            # Save Frobenius norm change in W
+            np.save(f"{save_dir}/total_change_W_Fnorm", total_change_W_Fnorm)
+
+            # Save OM eigvals during adaptation
+            np.save(f"{save_dir}/follow_eigvals", follow_eigvals)
 
 
 if __name__ == '__main__':
