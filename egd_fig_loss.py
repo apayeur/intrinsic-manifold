@@ -5,7 +5,7 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [1] # , 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
 load_dir_suffix = "-lr0.001-M6-iterAdapt2000"
@@ -93,8 +93,8 @@ for exponent_W in exponents_W:
     plt.close()
 
     # Plot mean +/- 2SEM adaptation loss
-    plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
-    plot_relative_loss = True
+    plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.25))
+    plot_relative_loss = False
     for perturbation_type in ['WM', 'OM']:
         if plot_relative_loss:
             perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
@@ -102,7 +102,7 @@ for exponent_W in exponents_W:
             perf = loss[perturbation_type]
         m = np.mean(perf, axis=0)
         std = np.std(perf, axis=0, ddof=1)
-        plt.plot(np.arange(m.shape[0]), m, label=perturbation_type,
+        plt.plot(np.arange(m.shape[0]), m, '-' if perturbation_type=='WM' else '--', label=perturbation_type,
                  color=col_w if perturbation_type=='WM' else col_o, lw=0.5)
         plt.fill_between(np.arange(m.shape[0]),
                          m- 2*std/loss['WM'].shape[0]**0.5,
@@ -116,8 +116,13 @@ for exponent_W in exponents_W:
         #plt.ylim([0, 0.5])
         plt.yticks([0, 0.5])
         plt.ylabel('Loss')
+    if exponent_W == 0.55:
+        plt.gca().text(0.5, 0.9, 'Lazy', ha='center', va='center', transform=plt.gca().transAxes)
+    elif exponent_W == 1:
+        plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
     #plt.xlim([0, len(m)])
     #plt.xlim([0, 500])
+    plt.xticks([0, 2000])
     #plt.xticks(plt.gca().get_xlim())
     plt.xlabel(x_label)
     plt.legend()
