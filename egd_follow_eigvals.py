@@ -7,8 +7,8 @@ plt.style.use('rnn4bci_plot_params.dms')
 
 output_fig_format = 'png'
 
-exponent = 0.6
-suffix = f"exponent_W{exponent}-lr0.001-M6-iterAdapt1000"
+exponent = 0.55
+suffix = f"exponent_W{exponent}-lr0.001-M6-iterAdapt500"
 load_dir = f"data/egd/{suffix}"
 save_fig_dir = f"results/egd/{suffix}"
 if not os.path.exists(save_fig_dir):
@@ -17,12 +17,40 @@ if not os.path.exists(save_fig_dir):
 evs = np.load(f"{load_dir}/follow_eigvals.npy", allow_pickle=True).item()
 _, nb_updates, _ = evs['initial'].shape
 nb_seeds, nb_updates_adapt, nb_units = evs['WM'].shape
-nb_seeds=1
+#nb_seeds=1
 # Check whether any eigvals became unstable
 for type_ in ['initial', 'WM', 'OM']:
     for seed in range(nb_seeds):
         if np.max(np.abs(evs[type_][seed])) >= 1:
             print("Found EVs greater than 1")
+
+
+# Plot participation ratio W
+plt.figure(figsize=(85/2*units_convert['mm'], 85/2*units_convert['mm']/1.25))
+# initial
+nb_real_eigvals = np.empty(shape=(nb_seeds, nb_updates))
+pr = np.sum(np.abs(evs['initial']), axis=-1)**2 / np.sum(np.abs(evs['initial'])**2, axis=-1)
+print(pr.shape)
+
+m = np.mean(pr, axis=0)
+sem = np.std(pr, axis=0, ddof=1) / nb_seeds**0.5
+plt.plot(np.arange(-nb_updates, 0), m, color='grey', label='initial')
+plt.fill_between(np.arange(-nb_updates, 0), m - 2*sem, m + 2*sem, color='grey', alpha=0.5, lw=0)
+# adapt
+for perturbation_type in ['WM', 'OM']:
+    pr = np.sum(np.abs(evs[perturbation_type]), axis=-1) ** 2 / np.sum(np.abs(evs[perturbation_type]) ** 2, axis=-1)
+    m = np.mean(pr, axis=0)
+    sem = np.std(pr, axis=0, ddof=1) / nb_seeds ** 0.5
+    plt.plot(np.arange(nb_updates_adapt), m, color=col_w if perturbation_type=='WM' else col_o, label=perturbation_type)
+    plt.fill_between(np.arange(nb_updates_adapt), m - 2 * sem, m + 2 * sem, color=col_w if perturbation_type=='WM' else col_o, alpha=0.5, lw=0)
+plt.xlim([-nb_updates, nb_updates_adapt])
+plt.xticks([-nb_updates, 0, nb_updates_adapt])
+plt.xlabel('Weight update post-perturb.')
+plt.ylabel('Participation ratio $W$')
+plt.legend()
+plt.tight_layout()
+plt.savefig(f'{save_fig_dir}/ParticipationRatioW.{output_fig_format}')
+plt.close()
 
 
 # Plot nb of real values vs updates
@@ -55,15 +83,14 @@ plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/NbRealValuesOM.{output_fig_format}')
 plt.close()
 
-
-# Plot eigval dynamics during adaptation
+"""# Plot eigval dynamics during adaptation
 selected_seed = 0
 perturbation_type = 'OM'
 # re-order evs
 evs = evs[perturbation_type][selected_seed]
 for i in range(evs.shape[0]):
     evs[i] = np.sort_complex(evs[i])
-"""
+
 nb_real_eigvals = np.zeros(nb_updates_adapt, dtype=int)
 real_eigvals = [evs[0, np.abs(np.imag(evs[0])) < 1e-8]]
 nb_real_eigvals[0] = len(real_eigvals[0])
@@ -112,7 +139,7 @@ for i in range(1, evs.shape[0]):
             index_min = np.argmin(np.abs(evs[i-1] - evs[i, j]))
             evs_ordered[index_min] = evs[i, j]
     evs[i] = evs_ordered 
-"""
+
 plt.figure(figsize=(85/2*units_convert['mm'], 85/2*units_convert['mm']))
 plt.gca().set_aspect('equal')
 plt.plot(np.real(evs[0, :]), np.imag(evs[0, :]), lw=0, marker='o', markersize=1, mew=0, color='k')
@@ -131,4 +158,4 @@ plt.xlabel('Real')
 plt.ylabel('Imaginary')
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/FollowEVs_{perturbation_type}_seed{selected_seed}.{output_fig_format}')
-plt.close()
+plt.close()"""

@@ -9,8 +9,9 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-load_dir = "data/egd/final_more_seeds"
-save_fig_dir = "results/egd/final_more_seeds"
+dir_suffix = "exponent_W0.55-lr0.001-M6-iterAdapt500-high-input"
+load_dir = f"data/egd/{dir_suffix}"
+save_fig_dir = f"results/egd/{dir_suffix}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 

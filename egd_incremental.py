@@ -12,13 +12,6 @@ from utils import units_convert, col_o, col_w
 plt.style.use('rnn4bci_plot_params.dms')
 
 def main(do_incremental_training):
-    tag = "incremental-training-stable-learning-many-incr"  # identification of this experiment, for bookkeeping
-    save_dir = f"data/egd/{tag}"
-    save_dir_results = f"results/egd/{tag}"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    if not os.path.exists(save_dir_results):
-        os.makedirs(save_dir_results)
 
     # Parameters
     size = (6, 100, 2)
@@ -31,9 +24,18 @@ def main(do_incremental_training):
     exponent_W = 0.55
 
     nb_iter = int(5e2)
-    nb_iter_adapt = int(5e2)
-    seeds = np.arange(10, dtype=int)
+    nb_iter_adapt = int(1e2)
+    seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
+    fraction_decrease_loss = 0.75
+
+    tag = f"incremental-training-exponent{exponent_W}"  # identification of this experiment, for bookkeeping
+    save_dir = f"data/egd/{tag}"
+    save_dir_results = f"results/egd/{tag}"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    if not os.path.exists(save_dir_results):
+        os.makedirs(save_dir_results)
 
     # Total losses
     loss_init = np.empty(shape=(len(seeds), nb_iter))
@@ -50,7 +52,7 @@ def main(do_incremental_training):
                           global_mean_input_is_zero=False,
                           initialization_type='random', exponent_W=exponent_W,
                           rng_seed=seed)
-        l, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+        l, _, _, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
         loss_init[seed_id] = l['total']
         if seed_id == 0:
             net0.plot_sample(sample_size=1000,
@@ -71,7 +73,7 @@ def main(do_incremental_training):
         net2.network_name = 'retrained_after_fitted'
         if relearn_after_decoder_fitting:
             print('\n|-------------------------------- Re-training with decoder --------------------------------|')
-            loss_decoder_retraining, _, _, _, _, _, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+            loss_decoder_retraining, _, _, _, _, _, _, _, _,  _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
             if seed_id == 0:
                 net2.plot_sample(sample_size=1000,
                                  outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.png")
@@ -88,24 +90,37 @@ def main(do_incremental_training):
 
         nb_iter_adapt_per_increment = -1
         if do_incremental_training:
-            as_ = [1, 2, 3, 4, 4.5, 5] #np.linspace(1, 5, num=4, endpoint=True)  #[1, 2, 3, 4, 4.5, 5]  # DEBUG [1, 2, 3, 4, 4.5, 5]
-            print(as_)
-            nb_iter_adapt_per_increment = nb_iter_adapt // len(as_)
+            as_ = [2, 3, 4, 4.5, 5] #np.linspace(1, 5, num=4, endpoint=True)  #[1, 2, 3, 4, 4.5, 5]  # DEBUG [1, 2, 3, 4, 4.5, 5]
             concat_total_loss = []
-            nb_iter_incr = 0
+            cum_nb_iter_incr = 0
             for a in as_:
-                net_om.V = (1 - a/max(as_)) * V_intrinsic + a/max(as_) * V_OM
-                l_0 = net_om.loss_function()
-                l, norm, a_min, a_max, nve, R_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=1e6, stopping_crit=0.25 * l_0)
-                nb_iter_incr += len(l['total'])
+                print(f"a = {a}: ")
+                if cum_nb_iter_incr < nb_iter_adapt:
+                    net_om.V = (1 - a/max(as_)) * V_intrinsic + a/max(as_) * V_OM
+                    l_0 = net_om.loss_function()
+                    l, norm, a_min, a_max, nve, R_seed, _, _, _, _, _ = net_om.train(lr=lr_adapt,
+                                                                                     nb_iter=1e6,
+                                                                                     stopping_crit=fraction_decrease_loss * l_0)
+                    if (len(l['total']) + cum_nb_iter_incr) > nb_iter_adapt:
+                        concat_total_loss.append(l['total'][: nb_iter_adapt - cum_nb_iter_incr])
+                        print(f"nb_iter = {nb_iter_adapt - cum_nb_iter_incr}")
+                        cum_nb_iter_incr = nb_iter_adapt
+                        break
+                    else:
+                        cum_nb_iter_incr += len(l['total'])
+                        concat_total_loss.append(l['total'])
+                        print(f"nb_iter = {len(l['total'])}")
+            if cum_nb_iter_incr < nb_iter_adapt:
+                l, norm, a_min, a_max, nve, R_seed, _, _, _, _, _ = net_om.train(lr=lr_adapt,
+                                                                                 nb_iter=nb_iter_adapt - cum_nb_iter_incr)
                 concat_total_loss.append(l['total'])
-            if nb_iter_adapt - nb_iter_incr > 0:
-                l, norm, a_min, a_max, nve, R_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt - nb_iter_incr)
-                concat_total_loss.append(l['total'])
-            concat_total_loss = np.concatenate(concat_total_loss)[:nb_iter_adapt]
+            concat_total_loss = np.concatenate(concat_total_loss)
+            if a != as_[-1]:
+                print("Did not reach full OM")
+            print(f"total iterations: {len(concat_total_loss)}")
         else:
             net_om.V = V_OM
-            l, norm, a_min, a_max, nve, R_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+            l, norm, a_min, a_max, nve, R_seed, _, _, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
             concat_total_loss = l['total']
 
         loss.append(concat_total_loss)

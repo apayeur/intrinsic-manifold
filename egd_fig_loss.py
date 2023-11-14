@@ -5,10 +5,10 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.6] # [0.55, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.55] # [0.55, 0.6, 0.7, 0.8, 0.9, 1]
 
 for exponent_W in exponents_W:
-    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt1000-TMP"
+    tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
     model_type = "egd" #"egd-high-dim-input"  #
     #tag = "plasticity-in-W-only-M6-lrU0-lrW0.001"
     load_dir = f"data/{model_type}/{tag}"
@@ -83,7 +83,7 @@ for exponent_W in exponents_W:
     plt.xlabel(x_label)
     plt.ylabel('$L/L_0$')
     #plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
-    #plt.xlim([0, 500])
+    plt.xlim([0, 500])
     #plt.xticks(plt.gca().get_xlim())
     plt.ylim([0,1])
     plt.yticks([0,0.5,1])
@@ -125,7 +125,6 @@ for exponent_W in exponents_W:
     outfile_name = f'{save_fig_dir}/LossAdapt.{output_fig_format}' if not plot_relative_loss else f'{save_fig_dir}/LossAdaptRelative.{output_fig_format}'
     plt.savefig(outfile_name)
     plt.close()
-
 
     # Plot subsampled relative performance
     subsampling = nb_iter_adapt // nb_iter_adapt
@@ -248,9 +247,10 @@ for exponent_W in exponents_W:
                      m_om - 2*std_om/ratio['OM'].shape[0]**0.5,
                      m_om + 2*std_om/ratio['OM'].shape[0]**0.5,
                      color=col_o, lw=0, alpha=0.5)
-
+    plt.xlim([0, 500])
+    plt.xticks([0, 500])
     plt.xlabel(x_label)
-    plt.ylabel(r'$\frac{1}{2}\|\|V \bar{\mathbf{v}} \|  \|^2$')
+    plt.ylabel(r'$\frac{1}{2}\|V \bar{\mathbf{v}} \|^2$')
     plt.legend()
     plt.tight_layout()
     plt.savefig(f'{save_fig_dir}/Loss_vbar.{output_fig_format}')
@@ -275,6 +275,8 @@ for exponent_W in exponents_W:
                      color=col_o, lw=0, alpha=0.5)
 
     plt.xlabel(x_label)
+    plt.xlim([0, 500])
+    plt.xticks([0, 500])
     plt.ylabel(r'$\frac{1}{2}$tr$\{V \mathbb{V}[\bar{\mathbf{v}}] V^\mathsf{T}\}$')
     plt.legend()
     plt.tight_layout()

@@ -26,8 +26,11 @@ for perturbation_type in ['WM', 'OM']:
     plt.plot(np.arange(len(m)), m, label=perturbation_type, color=col_w if perturbation_type == 'WM' else col_o)
     plt.fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem,
                      color=col_w if perturbation_type == 'WM' else col_o, alpha=0.5, lw=0)
+plt.xlim([0, 500])
+plt.xticks([0, 500])
+plt.yticks([0.9, 1])
 plt.xlabel('Weight update post-perturbation')
-plt.ylabel('Fraction of variance explained by $C$')
+plt.ylabel('Fraction of variance\nexplained by $C$')
 plt.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/FractionExplainedVariance.png')

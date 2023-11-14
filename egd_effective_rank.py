@@ -8,9 +8,9 @@ plt.style.use('rnn4bci_plot_params.dms')
 
 output_fig_format = 'png'
 
-exponents = [1]
+exponents = [0.55, 1]
 dir_suffixes = [f"exponent_W{expo}-lr0.001-M6-iterAdapt2000" for expo in exponents]
-plot_relative = True
+plot_relative = False
 if plot_relative:
     assert len(exponents) == 1, "Only a single should be plotted exponent when plotting relative PR"
 
@@ -18,16 +18,16 @@ save_fig_dir = f"results/egd/{dir_suffixes[0]}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
-pr = {expo: np.load(f"data/egd/exponent_W{expo}-lr0.001-M6-iterAdapt2000/participation_ratio_during_training.npy", allow_pickle=True).item() for expo in exponents}
-nb_seeds, nb_iter_initial = pr[exponents[0]]['initial'].shape
-nb_iter_adapt = pr[exponents[0]]['WM'].shape[1]
+er = {expo: np.load(f"data/egd/exponent_W{expo}-lr0.001-M6-iterAdapt2000/effective_rank.npy", allow_pickle=True).item() for expo in exponents}
+nb_seeds, nb_iter_initial = er[exponents[0]]['initial'].shape
+nb_iter_adapt = er[exponents[0]]['WM'].shape[1]
 
 plt.figure(figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
 for i, expo in enumerate(exponents):
     if plot_relative:
-        pr_loc = pr[expo]['initial'] / pr[expo]['initial'][:, [-1]]
+        pr_loc = er[expo]['initial'] / er[expo]['initial'][:, [-1]]
     else:
-        pr_loc = pr[expo]['initial']
+        pr_loc = er[expo]['initial']
     # plot pre-perturbation pr
     m = np.mean(pr_loc, axis=0)
     sem = np.std(pr_loc, axis=0, ddof=1) / nb_seeds ** 0.5
@@ -38,9 +38,9 @@ for i, expo in enumerate(exponents):
     # plot adaptation pr
     for perturbation_type in ['WM', 'OM']:
         if plot_relative:
-            pr_loc = pr[expo][perturbation_type] / pr[expo][perturbation_type][:, [-1]]
+            pr_loc = er[expo][perturbation_type] / er[expo][perturbation_type][:, [-1]]
         else:
-            pr_loc = pr[expo][perturbation_type]
+            pr_loc = er[expo][perturbation_type]
         m = np.mean(pr_loc, axis=0)
         sem = np.std(pr_loc, axis=0, ddof=1) / nb_seeds ** 0.5
         # for seed in range(nb_seeds):
@@ -59,9 +59,9 @@ plt.xticks([-nb_iter_initial, 0, nb_iter_adapt // 2, nb_iter_adapt])
 #plt.ylim([1, 6])
 #plt.yticks(np.arange(1, 6+1))
 plt.xlabel('Weight update')
-plt.ylabel('Participation ratio')
+plt.ylabel('Effective rank')
 plt.legend()
 plt.tight_layout()
-outfile_name = f'{save_fig_dir}/RelativePRThroughLearning.{output_fig_format}' if plot_relative else f'{save_fig_dir}/PRThroughLearning.{output_fig_format}'
+outfile_name = f'{save_fig_dir}/EffectiveRank.{output_fig_format}'
 plt.savefig(outfile_name)
 plt.close()
