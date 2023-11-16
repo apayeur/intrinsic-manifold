@@ -5,10 +5,10 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [1] # , 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.55] #, 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
-load_dir_suffix = "-lr0.001-M6-iterAdapt2000"
+load_dir_suffix = "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
     tag = f"exponent_W{exponent_W}{load_dir_suffix}"
@@ -93,7 +93,7 @@ for exponent_W in exponents_W:
     plt.close()
 
     # Plot mean +/- 2SEM adaptation loss
-    plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.25))
+    plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.15))
     plot_relative_loss = False
     for perturbation_type in ['WM', 'OM']:
         if plot_relative_loss:
@@ -113,7 +113,7 @@ for exponent_W in exponents_W:
         plt.yticks([0,0.5,1])
         plt.ylabel('$L/L_0$')
     else:
-        #plt.ylim([0, 0.5])
+        plt.ylim([0, 0.55])
         plt.yticks([0, 0.5])
         plt.ylabel('Loss')
     if exponent_W == 0.55:
@@ -122,7 +122,7 @@ for exponent_W in exponents_W:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
     #plt.xlim([0, len(m)])
     #plt.xlim([0, 500])
-    plt.xticks([0, 2000])
+    plt.xticks([0, len(m)])
     #plt.xticks(plt.gca().get_xlim())
     plt.xlabel(x_label)
     plt.legend()
@@ -287,17 +287,25 @@ for exponent_W in exponents_W:
     plt.close()
 
 # plot L^{OM}/L_0^{OM}/L^{WM}/L_0^{WM}
+regime = []
+for exponent_W in exponents_W:
+    if exponent_W == 0.55:
+        regime.append(" (lazy)")
+    elif exponent_W == 1:
+        regime.append(" (rich)")
+    else:
+        regime.append("")
 save_fig_dir = f"results/egd/eigvals-study{load_dir_suffix}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
-plt.figure(figsize=(85/2*units_convert['mm'], 85/2*units_convert['mm']/1.25))
+plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.25))
 colors = ['black', 'orange', 'green', 'pink']
 i = 0
-for exponent_W in exponents_W:
+for expo_i, exponent_W in enumerate(exponents_W):
     if exponent_W not in [0.6, 0.8, 0.9]:
         m = np.mean(diff_relative_loss[exponent_W], axis=0)
         sem = np.std(diff_relative_loss[exponent_W], axis=0, ddof=1) / diff_relative_loss[exponent_W].shape[0]**0.5
-        plt.plot(np.arange(m.shape[0]), m, color=colors[i], label=rf"$\alpha$ = {exponent_W}")
+        plt.plot(np.arange(m.shape[0]), m, color=colors[i], label=rf"$\alpha$ = {exponent_W}{regime[expo_i]}")
         plt.fill_between(np.arange(m.shape[0]), m - 2*sem,  m + 2*sem, color=colors[i], lw=0, alpha=0.5)
         i += 1
 plt.plot(np.arange(m.shape[0]), 0*np.arange(m.shape[0]), ":", color='grey')
@@ -305,7 +313,7 @@ plt.plot(np.arange(m.shape[0]), 0*np.arange(m.shape[0]), ":", color='grey')
 plt.ylabel("Difference of normalized\nlosses (OM $-$ WM)") #\n(normalized)')
 plt.xticks([0, 1000, 2000])
 plt.xlabel(x_label)
-plt.xlim([0, 2000])
+#plt.xlim([0, 2000])
 plt.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/DiffLoss.{output_fig_format}')
