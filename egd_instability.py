@@ -49,7 +49,7 @@ for lr in lrs:
         fraction_irregular_stable_seeds[perturbation_type].append((nb_stable_irregular_seeds + len(unstable_seeds)) / nb_seeds)
 
 # Plotting
-fig, ax = plt.subplots(ncols=1, figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
+fig, ax = plt.subplots(ncols=1, figsize=(114/3*units_convert['mm'], 114/3/1.25*units_convert['mm']))
 
 # proportion of unstable seeds
 for perturbation_type in ['WM', 'OM']:
@@ -65,7 +65,7 @@ ax.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/ProportionUnstableSeeds.{output_fig_format}')
 
-fig, ax = plt.subplots(ncols=1, figsize=(85/2*units_convert['mm'], 85/2/1.25*units_convert['mm']))
+fig, ax = plt.subplots(ncols=1, figsize=(114/3*units_convert['mm'], 114/3/1.25*units_convert['mm']))
 # proportion of irregular stable seeds
 for perturbation_type in ['WM', 'OM']:
     ax.plot(lrs, fraction_irregular_stable_seeds[perturbation_type], label=perturbation_type,
