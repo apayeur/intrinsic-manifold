@@ -94,10 +94,15 @@ for exponent_W in exponents_W:
 
     # Plot mean +/- 2SEM adaptation loss
     plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.15))
-    plot_relative_loss = False
+    plot_relative_loss = True
     for perturbation_type in ['WM', 'OM']:
         if plot_relative_loss:
             perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
+            print(perf.shape)
+            print(f"Loss {perturbation_type} at update 150", np.mean(perf[:, 150]),
+                  "+/-", 2*np.std(perf[:, 150], ddof=1)/perf.shape[0]**0.5)
+            print(f"Loss {perturbation_type} at update 67", np.mean(perf[:, 67]),
+                  "+/-", 2*np.std(perf[:, 67], ddof=1)/perf.shape[0]**0.5)
         else:
             perf = loss[perturbation_type]
         m = np.mean(perf, axis=0)

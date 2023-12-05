@@ -17,8 +17,8 @@ def main():
     lr_decoder = (0, 5e-3, 0)
     lrs = [0.001] #, 0.002, 0.005, 0.01, 0.02, 0.05]
     nb_iter = int(5e2)  # int(1e3)
-    nb_iter_adapt = int(2e3)  # was 5e3
-    seeds = np.arange(20, dtype=int)
+    nb_iter_adapt = int(1e1)  # was 5e3
+    seeds = np.arange(1, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
     exponents_W = [0.55] #[0.55, 0.6, 0.7, 0.8, 0.9]
@@ -28,8 +28,8 @@ def main():
         for lr in lrs:
             lr_adapt = (0, lr, 0)  # was lr/15
             # Manage save and load folders
-            #tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}"  # identification of this experiment, for bookkeeping
-            tag = f"zeroInitW-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}"
+            tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-tmp"  # identification of this experiment, for bookkeeping
+            #tag = f"zeroInitW-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-real-dims"
             save_dir = f"data/egd/{tag}"
             save_dir_results = f"results/egd/{tag}"
             if not os.path.exists(save_dir):
@@ -119,8 +119,11 @@ def main():
                                   input_subspace_dim=0, nb_inputs=size[0],
                                   use_data_for_decoding=False,
                                   global_mean_input_is_zero=False,
-                                  initialization_type='W-zero', exponent_W=exponent_W,
+                                  initialization_type='random', exponent_W=exponent_W,
                                   rng_seed=seed)
+                print("Mean of V0:", np.mean(net0.V))
+                print("Var of V0:", np.var(net0.V))
+
                 l, _, _, _, _, _, _, _, _, eigenvals_init[seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
 
                 # compute participation ratio
@@ -135,7 +138,7 @@ def main():
                 print('\n|-------------------------------- Fit decoder --------------------------------|')
                 net1 = copy.deepcopy(net0)
                 intrinsic_manifold_dim, real_dims[seed_id] = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
-                                                                              threshold=0.9)
+                                                                              threshold=0.95)
                 net1.network_name = 'fitted'
                 if seed_id == 0:
                     net1.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting.{output_fig_format}")
