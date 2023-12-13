@@ -15,13 +15,13 @@ def main():
     intrinsic_manifold_dim = 6  # 6
     lr_init = (0, 1e-2, 0)
     lr_decoder = (0, 5e-3, 0)
-    lrs = [0.001] #, 0.002, 0.005, 0.01, 0.02, 0.05]
+    lrs = [1e-4] #, 0.002, 0.005, 0.01, 0.02, 0.05]
     nb_iter = int(5e2)  # int(1e3)
-    nb_iter_adapt = int(1e1)  # was 5e3
+    nb_iter_adapt = int(1e3)  # was 5e3
     seeds = np.arange(1, dtype=int)
     relearn_after_decoder_fitting = False
     #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
-    exponents_W = [0.55] #[0.55, 0.6, 0.7, 0.8, 0.9]
+    exponents_W = [0.5] #[0.55, 0.6, 0.7, 0.8, 0.9]
     do_scale_V_OM = False
 
     for exponent_W in exponents_W:
@@ -121,8 +121,6 @@ def main():
                                   global_mean_input_is_zero=False,
                                   initialization_type='random', exponent_W=exponent_W,
                                   rng_seed=seed)
-                print("Mean of V0:", np.mean(net0.V))
-                print("Var of V0:", np.var(net0.V))
 
                 l, _, _, _, _, _, _, _, _, eigenvals_init[seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
 
