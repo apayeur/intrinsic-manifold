@@ -9,19 +9,18 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 100, 2)
-    input_noise_intensity = 0e-4
-    private_noise_intensity = 1e-2  # 1e-3
-    intrinsic_manifold_dim = 6  # 6
-    lr_init = (0, 1e-2, 0)
-    lr_decoder = (0, 5e-3, 0)
-    lrs = [1e-4] #, 0.002, 0.005, 0.01, 0.02, 0.05]
-    nb_iter = int(5e2)  # int(1e3)
-    nb_iter_adapt = int(1e3)  # was 5e3
-    seeds = np.arange(1, dtype=int)
+    size = (6, 100, 2)              # (input size, recurrent size, output size)
+    input_noise_intensity = 0e-4    # set to zero for 1-of-K encoding
+    private_noise_intensity = 1e-2
+    intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
+    lr_init = (0, 1e-2, 0)          # learning rate for initial training
+    lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
+    lrs = [0.001] #, 0.002, 0.005, 0.01, 0.02, 0.05]  # learning rate during adaptation
+    nb_iter = int(5e2)              # nb of gradient iteration during initial training
+    nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
+    seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
-    #exponent_W = 0.55  # W_0 ~ N(0, 1/N^exponent_W)
-    exponents_W = [0.5] #[0.55, 0.6, 0.7, 0.8, 0.9]
+    exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
     do_scale_V_OM = False
 
     for exponent_W in exponents_W:
