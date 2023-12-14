@@ -10,7 +10,8 @@ Simulation of a BMI center-out reaching task using a static Gaussian linear recu
 
 *`results/`: contains figure elements
 
-# Main files 
-* egd.py : contains simulation of the BCI task 
 
-* toy_model.py : contains the class for the (toy) model 
+# How to produce figures from the paper
+* Figure 1: run `fig1.py`. Then run `egd_fig_perturbation.py`
+
+* Figure 2: run `fig2.py`. Then run `edg_fig_loss.py` (panels A-B), `   

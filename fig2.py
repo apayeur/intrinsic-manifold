@@ -27,7 +27,7 @@ def main():
         for lr in lrs:
             lr_adapt = (0, lr, 0)  # was lr/15
             # Manage save and load folders
-            tag = f"exponent_W{exponent_W}-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}"  # identification of this experiment, for bookkeeping
+            tag = f"fig2-exponent_W{exponent_W}"  # identification of this experiment, for bookkeeping
             #tag = f"zeroInitW-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-real-dims"
             save_dir = f"data/egd/{tag}"
             save_dir_results = f"results/egd/{tag}"
