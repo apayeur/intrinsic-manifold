@@ -5,9 +5,10 @@ import os
 plt.style.use('rnn4bci_plot_params.dms')
 
 exponent_W = 0.55
-file_suffix = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
-load_dir = f"data/egd/{file_suffix}"
-save_fig_dir = f"results/egd/{file_suffix}"
+#file_suffix = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
+tag = f"fig2-exponent_W{exponent_W}"
+load_dir = f"data/egd/{tag}"
+save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 

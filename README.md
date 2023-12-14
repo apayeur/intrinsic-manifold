@@ -14,4 +14,4 @@ Simulation of a BMI center-out reaching task using a static Gaussian linear recu
 # How to produce figures from the paper
 * Figure 1: run `fig1.py`. Then run `egd_fig_perturbation.py`
 
-* Figure 2: run `fig2.py`. Then run `edg_fig_loss.py` (panels A-B), `   
+* Figure 2: run `fig2.py`. Then run `edg_fig_loss.py` (panels A-B), `egd_fig_gradW.py` (C), and `edg_fig_total_delta_W.py` (D). You might have to change the name of the load directory in accordance with what you used as `tag` in `fig2.py`.    
