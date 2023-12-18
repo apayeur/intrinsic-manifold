@@ -12,8 +12,8 @@ save_fig_dir = f"results/egd/rich_vs_lazy"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
-delta_W_lazy = np.load("data/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000/total_change_W_Fnorm.npy", allow_pickle=True).item()
-delta_W_rich = np.load("data/egd/exponent_W1-lr0.001-M6-iterAdapt2000/total_change_W_Fnorm.npy", allow_pickle=True).item()
+delta_W_lazy = np.load("data/egd/fig2-exponent_W0.55/total_change_W_Fnorm.npy", allow_pickle=True).item()
+delta_W_rich = np.load("data/egd/fig2-exponent_W1.0/total_change_W_Fnorm.npy", allow_pickle=True).item()
 
 data = []
 data.append(delta_W_lazy['WM'])

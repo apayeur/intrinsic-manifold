@@ -42,7 +42,7 @@ def main():
                       initialization_type='random', exponent_W=exponent_W,
                       rng_seed=seed)
 
-    l, _, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
+    l, _, _, _, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
 
     net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
 
@@ -57,7 +57,7 @@ def main():
     net2.network_name = 'retrained_after_fitted'
     if relearn_after_decoder_fitting:
         print('\n|-------------------------------- Re-training with decoder --------------------------------|')
-        loss_decoder_retraining, _, _, _, _, _, _,_, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+        loss_decoder_retraining, _, _, _, _, _, _,_, _, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
         net2.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.{output_fig_format}")
 
     print('\n|-------------------------------- Select perturbations --------------------------------|')
@@ -72,7 +72,7 @@ def main():
 
     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.{output_fig_format}")
 
-    l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+    l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, _, _, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
 
@@ -83,7 +83,7 @@ def main():
 
     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.{output_fig_format}")
 
-    l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+    l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")
 

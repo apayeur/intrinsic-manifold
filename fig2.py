@@ -99,11 +99,6 @@ def main():
             # Candidate perturbation losses
             wm_total_losses, om_total_losses = None, None
 
-            # Eigenvalues
-            eigenvals_init = np.empty(shape=(len(seeds), nb_iter))
-            eigenvals = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                         'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
-
             # Participation ratio
             p_ratio = {'initial': np.empty(shape=len(seeds)),
                        'WM': np.empty(shape=len(seeds)),
@@ -121,7 +116,7 @@ def main():
                                   initialization_type='random', exponent_W=exponent_W,
                                   rng_seed=seed)
 
-                l, _, _, _, _, _, _, _, _, eigenvals_init[seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
+                l, _, _, _, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
 
                 # compute participation ratio
                 p_ratio['initial'][seed_id] = net0.participation_ratio()
@@ -145,7 +140,7 @@ def main():
                 net2 = copy.deepcopy(net1)
                 net2.network_name = 'retrained_after_fitted'
                 if relearn_after_decoder_fitting:
-                    loss_decoder_retraining, _, _, _, _, _, _,_, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+                    loss_decoder_retraining, _, _, _, _, _, _, _, _, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
                     if seed_id == 0:
                         net2.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.{output_fig_format}")
 
@@ -166,7 +161,7 @@ def main():
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, eigenvals['WM'][seed_id] = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, _, _, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
@@ -204,7 +199,7 @@ def main():
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, eigenvals['OM'][seed_id] = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")
@@ -285,10 +280,6 @@ def main():
             # Save candidate perturbations losses
             np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
             np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)
-
-            # Save eigenvalues
-            np.save(f"{save_dir}/eigenvals_init", eigenvals_init)
-            np.save(f"{save_dir}/eigenvals", eigenvals)
 
             # Save participation ratios
             np.save(f"{save_dir}/participation_ratio", p_ratio)

@@ -5,20 +5,19 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55] #, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.55, 1.0] #, 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
-load_dir_suffix = "-lr0.001-M6-iterAdapt500"
+load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"exponent_W{exponent_W}{load_dir_suffix}"
-    model_type = "egd" #"egd-high-dim-input"  #
-    #tag = "plasticity-in-W-only-M6-lrU0-lrW0.001"
+    tag = f"fig2-exponent_W{exponent_W}"
+    model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
     if not os.path.exists(save_fig_dir):
         os.makedirs(save_fig_dir)
-
+    """
     # Exclude seed if max eigenvalue of W becomes unstable (> 1)
     max_eigvals = {'W_WM': np.load(f"{load_dir}/eigenvals_after_WMP.npy"),
                    'W_OM': np.load(f"{load_dir}/eigenvals_after_OMP.npy")}
@@ -26,8 +25,9 @@ for exponent_W in exponents_W:
     nb_unstable_seed_WM = len(np.where(max_eigvals['W_WM'] > 1)[0])
     print("Nb of unstable seeds WM", nb_unstable_seed_WM)
     print("Nb of unstable seeds OM", nb_unstable_seed_WM)
+    """
 
-    #seeds_to_exclude =[]
+    seeds_to_exclude =[]
     params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
     seeds_to_include = [i for i in range(params['nb_seeds']) if i not in seeds_to_exclude]
 
@@ -94,7 +94,7 @@ for exponent_W in exponents_W:
 
     # Plot mean +/- 2SEM adaptation loss
     plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.15))
-    plot_relative_loss = True
+    plot_relative_loss = False
     for perturbation_type in ['WM', 'OM']:
         if plot_relative_loss:
             perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
