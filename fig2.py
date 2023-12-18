@@ -18,7 +18,7 @@ def main():
     lrs = [0.001]  # learning rate during adaptation
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(2e3)        # nb of gradient iteration during adaptation
-    seeds = np.arange(20, dtype=int)
+    seeds = np.arange(3, dtype=int)
     relearn_after_decoder_fitting = False
     exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
     do_scale_V_OM = False
@@ -104,6 +104,10 @@ def main():
                        'WM': np.empty(shape=len(seeds)),
                        'OM': np.empty(shape=len(seeds))}
 
+            # Frobenius norm of total weight change
+            total_change_W_Fnorm = {'WM': np.empty(shape=len(seeds)),
+                                    'OM': np.empty(shape=len(seeds))}
+
             for seed_id, seed in enumerate(seeds):
                 print(f'\n|==================================== Seed {seed} =====================================|')
                 print('\n|-------------------------------- Initial training --------------------------------|')
@@ -186,6 +190,8 @@ def main():
 
                 p_ratio['WM'][seed_id] = net_wm.participation_ratio()
 
+                total_change_W_Fnorm['WM'][seed_id] = np.linalg.norm(net_wm.W - net0.W)
+
                 print('\n|-------------------------------- OM perturbation --------------------------------|')
                 net_om = copy.deepcopy(net2)
                 net_om.network_name = 'om'
@@ -221,6 +227,8 @@ def main():
                     max_angles['OM'][key][seed_id] = a_max[key]
 
                 p_ratio['OM'][seed_id] = net_om.participation_ratio()
+
+                total_change_W_Fnorm['OM'][seed_id] = np.linalg.norm(net_om.W - net0.W)
 
             # Save parameters
             param_dict = {'size': size,
@@ -284,6 +292,8 @@ def main():
             # Save participation ratios
             np.save(f"{save_dir}/participation_ratio", p_ratio)
 
+            # Save Frobenius norm of total weight change
+            np.save(f"{save_dir}/total_change_W_Fnorm", total_change_W_Fnorm)
 
 if __name__ == '__main__':
     main()
