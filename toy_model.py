@@ -542,7 +542,7 @@ class ToyNetwork:
         rel_proj_var_OM = []
 
         pr = []
-        follow_eigvals = []
+        max_eigvals = []
         effective_rank = []
 
         if self.D is not None:
@@ -570,9 +570,9 @@ class ToyNetwork:
             losses['vbar'].append(0.5*np.linalg.norm(self.V @ self.get_mean_activity())**2)
             loss = loss_var + loss_exp
             pr.append(self.participation_ratio())
-            follow_eigvals.append(np.linalg.eigvals(self.W))
+            max_eigvals.append(np.max(np.abs(np.linalg.eigvals(self.W))))
             effective_rank.append(self.effective_rank(self.W))
-            if np.max(np.abs(follow_eigvals[-1])) >= 1:
+            if max_eigvals[-1] >= 1:
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!")
                 print("EIGENVALUE GREATER THAN 1")
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -644,7 +644,7 @@ class ToyNetwork:
             # if max_eig_valW > 1:
             #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
             i += 1
-        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM, pr, follow_eigvals, effective_rank
+        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM, pr, max_eigvals, effective_rank
 
     def train_with_batch_sgd(self, lr=(1e-3, 1.e-3, 1e-3), nb_iter=int(1e3), stopping_crit=None):
         """Train network with batch GD instead of exact gradient descent."""

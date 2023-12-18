@@ -16,14 +16,14 @@ fraction_irregular_stable_seeds = {'WM': [], 'OM': []}
 
 output_fig_format = 'png'
 model_type = "egd"
-tag = "exponent_W0.55-M6-iterAdapt1000-lrstudy"
+tag = "fig3-exponent_W0.55-M6-iterAdapt1000-lrstudy"
 save_fig_dir = f"results/{model_type}/{tag}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
 for lr in lrs:
     # Load data
-    load_dir = f"data/{model_type}/exponent_W0.55-lr{lr}-M6-iterAdapt1000-lrstudy"
+    load_dir = f"data/{model_type}/fig3-exponent_W0.55-lr{lr}-lrstudy"
 
     max_eigvals = {'WM': np.load(f"{load_dir}/eigenvals_after_WMP.npy"),
                    'OM': np.load(f"{load_dir}/eigenvals_after_OMP.npy")}
