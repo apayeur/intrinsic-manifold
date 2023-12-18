@@ -9,12 +9,9 @@ import numpy as np
 from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
-mpl.rcParams['font.size'] = 7
-mpl.rcParams['axes.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
 
-output_fig_format = 'pdf'
+
+output_fig_format = 'png'
 
 
 # Functions
@@ -28,8 +25,8 @@ def find_adaptation_time(loss, loss_fractions):
 
 
 # Loading data
-load_dir = "data/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000"
-save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6-iterAdapt2000"
+load_dir = "data/egd/exponent_W0.55-lr0.001-M6-iterAdapt500-high-input3"
+save_fig_dir = "results/egd/exponent_W0.55-lr0.001-M6-iterAdapt500-high-input3"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
@@ -41,15 +38,13 @@ labels = {'D': 'Original', 'DP_WM': 'Perturbed'}
 # Prescribed loss fractions where to evaluate change in decoder projected covariability
 loss_fractions = [0.5, 0.75, 0.9]
 
-_, axes = plt.subplots(nrows=2, figsize=(45*units_convert['mm'], 2*45*units_convert['mm']/1.25), sharex=True, sharey=True)
+_, axes = plt.subplots(ncols=2, figsize=(85*units_convert['mm'], 85/2*units_convert['mm']/1.15), sharex=True, sharey=True)
 axes_dict = {'D': axes[0], 'DP_WM': axes[1]}
 for projection_type in ['D', 'DP_WM']:
     adapt_times = []
     relative_A = np.empty((loss_wm.shape[0], len(loss_fractions)))
     for seed in range(loss_wm.shape[0]):
-        print(len(loss_wm[seed]))
         adapt_times = find_adaptation_time(loss_wm[seed], loss_fractions)
-        print(adapt_times)
         relative_A[seed] = 100 * (A[projection_type][seed][adapt_times] - A[projection_type][seed,0]) / A[projection_type][seed,0]
     m = np.median(relative_A, axis=0)
     print(f"{projection_type}: Median = {m}")
@@ -57,6 +52,11 @@ for projection_type in ['D', 'DP_WM']:
     vp = axes_dict[projection_type].violinplot(relative_A,
                                                positions=100 * np.array(loss_fractions),
                                                showmedians=True, widths=5)
+    # display median values next to violins
+    shifts = [0.03, -0.03, -0.03]
+    has = ['left', 'right', 'right']
+    for j, med_ in enumerate(m):
+        axes_dict[projection_type].text(100*(loss_fractions[j]+shifts[j]), med_, f'{med_:2.0f}', ha=has[j], va='center', fontsize=4)
     for pc in vp['bodies']:
         pc.set_facecolor('grey' if projection_type == 'D' else col_w)
         pc.set_edgecolor(None)
@@ -66,7 +66,9 @@ for projection_type in ['D', 'DP_WM']:
     vp['cmaxes'].set_color('grey' if projection_type == 'D' else col_w)
     vp['cmins'].set_color('grey' if projection_type == 'D' else col_w)
     vp['cmedians'].set_color('grey' if projection_type == 'D' else col_w)
-    axes_dict[projection_type].set_title(labels[projection_type], pad=2)
+    #axes_dict[projection_type].set_title(labels[projection_type], pad=2)
+    axes_dict[projection_type].text(0.5, 0.9, labels[projection_type], ha='center',
+                                    va='bottom', transform=axes_dict[projection_type].transAxes)
 
     #for i in range(relative_A.shape[0]):
     #    plt.plot(np.arange(len(m)), relative_A[i], color='black' if projection_type == 'D' else (0.9, 0.6, 0), lw=0.2)
@@ -74,15 +76,16 @@ for projection_type in ['D', 'DP_WM']:
     #         label=labels[projection_type], color='black' if projection_type == 'D' else (0.9, 0.6, 0))
     #plt.fill_between(np.arange(len(m)), m - 2 * sem, m + 2 * sem,
     #                 color='black' if projection_type == 'D' else (0.9, 0.6, 0), alpha=0.5, lw=0)
+axes[0].set_xlabel('Percentage decrease in loss')
 axes[1].set_xlabel('Percentage decrease in loss')
 axes[0].set_ylabel('Change in decoder-\nprojected covariability (%)')
-axes[1].set_ylabel('Change in decoder-\nprojected covariability (%)')
+#axes[1].set_ylabel('Change in decoder-\nprojected covariability (%)')
 
 for ax in axes:
     ax.set_xticks(100*np.array(loss_fractions))
     ax.set_xticklabels([int(100*l) for l in loss_fractions])
-    ax.set_ylim(ymax=850)
-    ax.set_yticks(np.arange(0, 810, 200))
+    #ax.set_ylim(ymax=850)
+    #ax.set_yticks(np.arange(0, 810, 200))
 
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/Strategies.{output_fig_format}')

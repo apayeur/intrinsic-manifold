@@ -540,7 +540,10 @@ class ToyNetwork:
              'DP_WM': []}
         f = []
         rel_proj_var_OM = []
-        max_eigvalsW = []
+
+        pr = []
+        follow_eigvals = []
+        effective_rank = []
 
         if self.D is not None:
             d = self.D.shape[1]
@@ -566,17 +569,24 @@ class ToyNetwork:
             losses['proj'].append(loss_proj)
             losses['vbar'].append(0.5*np.linalg.norm(self.V @ self.get_mean_activity())**2)
             loss = loss_var + loss_exp
+            pr.append(self.participation_ratio())
+            follow_eigvals.append(np.linalg.eigvals(self.W))
+            effective_rank.append(self.effective_rank(self.W))
+            if np.max(np.abs(follow_eigvals[-1])) >= 1:
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                print("EIGENVALUE GREATER THAN 1")
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                break
 
             if nb_iter == 0:
                 if i % 500 == 0:
                     print(f"Loss at iteration {i} = {loss}")
-            elif i % int(nb_iter / 5) == 0 or i == nb_iter-1:
-                print(f"Loss at iteration {i} = {loss} | floor ratio = {self.floor_loss() / loss}")
+            elif nb_iter > 5:
+                if i % (nb_iter // 5) == 0 or i == nb_iter-1:
+                    print(f"Loss at iteration {i} = {loss}")
 
             # Compute gradient
             g = self.compute_gradient()
-
-            max_eigvalsW.append(np.max(np.abs(np.linalg.eigvals(self.W))))
 
             if self.C is not None:
                 # Compute norm of the gradient
@@ -634,7 +644,7 @@ class ToyNetwork:
             # if max_eig_valW > 1:
             #    print(f"UNSTABLE: maximum eigval of W = {max_eig_valW}")
             i += 1
-        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM, max_eigvalsW
+        return losses, norm_gradW, min_angles, max_angles, normalized_variance_explained, R, A, f, rel_proj_var_OM, pr, follow_eigvals, effective_rank
 
     def train_with_batch_sgd(self, lr=(1e-3, 1.e-3, 1e-3), nb_iter=int(1e3), stopping_crit=None):
         """Train network with batch GD instead of exact gradient descent."""
@@ -957,7 +967,7 @@ class ToyNetwork:
             #        print(loss(D, Var + vbarvbarT))
             #    D += 2e-3 * (self.V - D@self.C) @ (Var + vbarvbarT) @ self.C.T
             #self.D = D
-            self.D = self.V @ (Var + vbarvbarT) @self.C.T @ np.linalg.inv(self.C @ (Var + vbarvbarT) @ self.C.T)
+            self.D = self.V @ (Var + vbarvbarT) @ self.C.T @ np.linalg.inv(self.C @ (Var + vbarvbarT) @ self.C.T)
             self.V = self.D @ self.C
             #self.intercept = -self.V @ self.get_mean_activity()
         return intrinsic_manifold_dim, dim
@@ -1128,6 +1138,14 @@ class ToyNetwork:
 
     def dimensionality_input(self, threshold=0.99):
         return self.dimensionality_(self.compute_total_input_covariance(), threshold=threshold)
+
+    @staticmethod
+    def effective_rank(M):
+        """See Roy and Vitterbi"""
+        _, s, _ = np.linalg.svd(M)
+        p = s / np.sum(np.abs(s))
+        H = - np.sum(p[s != 0] * np.log(p[s != 0]))
+        return np.exp(H)
 
     @staticmethod
     def participation_ratio_(covariance_matrix):

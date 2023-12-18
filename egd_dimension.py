@@ -16,6 +16,7 @@ def bins_with_same_number_of_points(x, nb_points=10):
     bins = np.append(bins, sorted_x[-1])
     return bins
 
+
 load_dir_prefix = "data/egd/exponent_W"
 load_dir_suffix = "-lr0.001-M6-iterAdapt2000"
 save_fig_dir = f"results/egd/eigvals-study{load_dir_suffix}"

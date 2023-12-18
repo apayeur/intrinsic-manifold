@@ -136,7 +136,6 @@ for exponent_W in exponents_W:
     plt.savefig(outfile_name)
     plt.close()
 
-
     # Plot subsampled relative performance
     subsampling = nb_iter_adapt // nb_iter_adapt
     shift = nb_iter_adapt // 50  # for clearer plot
@@ -258,9 +257,10 @@ for exponent_W in exponents_W:
                      m_om - 2*std_om/ratio['OM'].shape[0]**0.5,
                      m_om + 2*std_om/ratio['OM'].shape[0]**0.5,
                      color=col_o, lw=0, alpha=0.5)
-
+    plt.xlim([0, 500])
+    plt.xticks([0, 500])
     plt.xlabel(x_label)
-    plt.ylabel(r'$\frac{1}{2}\|\|V \bar{\mathbf{v}} \|  \|^2$')
+    plt.ylabel(r'$\frac{1}{2}\|V \bar{\mathbf{v}} \|^2$')
     plt.legend()
     plt.tight_layout()
     plt.savefig(f'{save_fig_dir}/Loss_vbar.{output_fig_format}')
@@ -285,6 +285,8 @@ for exponent_W in exponents_W:
                      color=col_o, lw=0, alpha=0.5)
 
     plt.xlabel(x_label)
+    plt.xlim([0, 500])
+    plt.xticks([0, 500])
     plt.ylabel(r'$\frac{1}{2}$tr$\{V \mathbb{V}[\bar{\mathbf{v}}] V^\mathsf{T}\}$')
     plt.legend()
     plt.tight_layout()

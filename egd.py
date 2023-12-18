@@ -22,6 +22,7 @@ def main():
     relearn_after_decoder_fitting = False
     exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
     do_scale_V_OM = False
+    do_follow_ev = False
 
     for exponent_W in exponents_W:
         for lr in lrs:
@@ -98,14 +99,27 @@ def main():
             wm_total_losses, om_total_losses = None, None
 
             # Eigenvalues
-            eigenvals_init = np.empty(shape=(len(seeds), nb_iter))
-            eigenvals = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                         'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            eigenvals_0 = []
+            eigenvals_init = []
+            eigenvals_after_WMP = []
+            eigenvals_after_OMP = []
 
             # Participation ratio
-            p_ratio = {'initial': np.empty(shape=len(seeds)),
-                       'WM': np.empty(shape=len(seeds)),
-                       'OM': np.empty(shape=len(seeds))}
+            p_ratio = {'initial': np.empty(shape=(len(seeds), nb_iter)),
+                       'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
+                       'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+
+            total_change_W_Fnorm = {'WM': [], 'OM': []}
+
+            if do_follow_ev:
+                follow_eigvals = {'initial': np.empty(shape=(len(seeds), nb_iter, size[1]), dtype=complex),
+                                  'WM': np.empty(shape=(len(seeds), nb_iter_adapt, size[1]), dtype=complex),
+                                  'OM': np.empty(shape=(len(seeds), nb_iter_adapt, size[1]), dtype=complex)}
+
+            effective_rank = {'initial': np.empty(shape=(len(seeds), nb_iter)),
+                              'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
+                              'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+
 
             for seed_id, seed in enumerate(seeds):
                 print(f'\n|==================================== Seed {seed} =====================================|')
@@ -119,10 +133,17 @@ def main():
                                   initialization_type='random', exponent_W=exponent_W,
                                   rng_seed=seed)
 
-                l, _, _, _, _, _, _, _, _, eigenvals_init[seed_id] = net0.train(lr=lr_init, nb_iter=nb_iter)
+                # compute max eigenvalue
+                eigenvals_0.append(np.max(np.abs(np.linalg.eigvals(net0.W))))
+                l, _, _, _, _, _, _, _, _, p_ratio['initial'][seed_id], evs, effective_rank['initial'][seed_id] \
+                    = net0.train(lr=lr_init, nb_iter=nb_iter)
 
-                # compute participation ratio
-                p_ratio['initial'][seed_id] = net0.participation_ratio()
+                if do_follow_ev:
+                    follow_eigvals['initial'][seed_id] = evs
+
+                # compute max eigenvalue
+                eigval_init = np.max(np.abs(np.linalg.eigvals(net0.W)))
+                eigenvals_init.append(eigval_init)
 
                 # save loss
                 loss_init[seed_id] = l['total']
@@ -143,7 +164,8 @@ def main():
                 net2 = copy.deepcopy(net1)
                 net2.network_name = 'retrained_after_fitted'
                 if relearn_after_decoder_fitting:
-                    loss_decoder_retraining, _, _, _, _, _, _,_, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+                    loss_decoder_retraining, _, _, _, _, _, _,_, _, _, _ = net2.train(lr=lr_decoder, nb_iter=nb_iter//10)
+
                     if seed_id == 0:
                         net2.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder.{output_fig_format}")
 
@@ -164,10 +186,13 @@ def main():
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, eigenvals['WM'][seed_id] = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, p_ratio['WM'][seed_id], evs, effective_rank['WM'][seed_id] = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
+
+                if do_follow_ev:
+                    follow_eigvals['WM'][seed_id] = evs
 
                 loss['WM'][seed_id] = l['total']
                 loss_var['WM'][seed_id] = l['var']
@@ -187,7 +212,9 @@ def main():
                     min_angles['WM'][key][seed_id] = a_min[key]
                     max_angles['WM'][key][seed_id] = a_max[key]
 
-                p_ratio['WM'][seed_id] = net_wm.participation_ratio()
+                eigval_after_WM = np.max(np.abs(np.linalg.eigvals(net_wm.W)))
+                print(f"Max eigenvalue of W: {eigval_after_WM}")
+                eigenvals_after_WMP.append(eigval_after_WM)
 
                 print('\n|-------------------------------- OM perturbation --------------------------------|')
                 net_om = copy.deepcopy(net2)
@@ -202,11 +229,14 @@ def main():
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.{output_fig_format}")
 
-                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, eigenvals['OM'][seed_id] = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
+                l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, p_ratio['OM'][seed_id], evs, effective_rank['OM'][seed_id]\
+                    = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
                 if seed_id == 0:
                     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")
 
+                if do_follow_ev:
+                    follow_eigvals['OM'][seed_id] = evs
                 loss['OM'][seed_id] = l['total']
                 loss_var['OM'][seed_id] = l['var']
                 loss_exp['OM'][seed_id] = l['exp']
@@ -223,7 +253,12 @@ def main():
                     min_angles['OM'][key][seed_id] = a_min[key]
                     max_angles['OM'][key][seed_id] = a_max[key]
 
-                p_ratio['OM'][seed_id] = net_om.participation_ratio()
+                eigval_after_OM = np.max(np.abs(np.linalg.eigvals(net_om.W)))
+                print(f"Max eigenvalue of W: {eigval_after_OM}")
+                eigenvals_after_OMP.append(eigval_after_OM)
+
+                total_change_W_Fnorm['WM'].append(np.linalg.norm(net_wm.W - net0.W))
+                total_change_W_Fnorm['OM'].append(np.linalg.norm(net_om.W - net0.W))
 
             # Save parameters
             param_dict = {'size': size,
@@ -285,11 +320,23 @@ def main():
             np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)
 
             # Save eigenvalues
+            np.save(f"{save_dir}/eigenvals_0", eigenvals_0)
             np.save(f"{save_dir}/eigenvals_init", eigenvals_init)
-            np.save(f"{save_dir}/eigenvals", eigenvals)
+            np.save(f"{save_dir}/eigenvals_after_WMP", eigenvals_after_WMP)
+            np.save(f"{save_dir}/eigenvals_after_OMP", eigenvals_after_OMP)
 
             # Save participation ratios
-            np.save(f"{save_dir}/participation_ratio", p_ratio)
+            np.save(f"{save_dir}/participation_ratio_during_training", p_ratio)
+
+            # Save Frobenius norm change in W
+            np.save(f"{save_dir}/total_change_W_Fnorm", total_change_W_Fnorm)
+
+            # Save eigvals during adaptation
+            if do_follow_ev:
+                np.save(f"{save_dir}/follow_eigvals", follow_eigvals)
+
+            # Save effective rank W
+            np.save(f"{save_dir}/effective_rank", effective_rank)
 
 
 if __name__ == '__main__':

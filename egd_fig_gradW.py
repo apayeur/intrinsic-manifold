@@ -9,6 +9,7 @@ exponent_W = 0.55
 tag = f"fig2-exponent_W{exponent_W}"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
+
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
