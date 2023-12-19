@@ -18,7 +18,7 @@ def main():
     lrs = [0.001]  # learning rate during adaptation
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(2e3)        # nb of gradient iteration during adaptation
-    seeds = np.arange(3, dtype=int)
+    seeds = np.arange(20, dtype=int)
     relearn_after_decoder_fitting = False
     exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
     do_scale_V_OM = False
