@@ -7,9 +7,4 @@ Simulation of a BMI center-out reaching task using a static Gaussian linear recu
 * Conda env file `analysis/environment.yml`contains the python dependencies.
 
 
-# Folders in the repository
-*`data/` : contains data from simulations
-
-*`results/`: contains figure elements
-
 
