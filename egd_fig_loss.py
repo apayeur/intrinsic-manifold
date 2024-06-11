@@ -11,7 +11,7 @@ output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-exponent_W{exponent_W}"
+    tag = f"fig2-8targets_W{exponent_W}"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -94,7 +94,7 @@ for exponent_W in exponents_W:
 
     # Plot mean +/- 2SEM adaptation loss
     plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.15))
-    plot_relative_loss = False
+    plot_relative_loss = True
     for perturbation_type in ['WM', 'OM']:
         if plot_relative_loss:
             perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
@@ -125,10 +125,12 @@ for exponent_W in exponents_W:
         plt.gca().text(0.5, 0.9, 'Lazy', ha='center', va='center', transform=plt.gca().transAxes)
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
-    #plt.xlim([0, len(m)])
-    #plt.xlim([0, 500])
-    plt.xticks([0, len(m)])
-    #plt.xticks(plt.gca().get_xlim())
+    if exponent_W == 0.55:
+        plt.xlim([0, 500])
+        plt.xticks(plt.gca().get_xlim())
+    else:
+        plt.xlim([0, len(m)])
+        plt.xticks([0, len(m)])
     plt.xlabel(x_label)
     plt.legend()
     plt.tight_layout()

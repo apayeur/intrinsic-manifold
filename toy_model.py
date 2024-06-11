@@ -71,7 +71,7 @@ class ToyNetwork:
     """
     def __init__(self, network_name, size=(100,50,2), nb_inputs=8, private_noise_intensity=1e-3,
                  input_noise_intensity=1e-2, input_subspace_dim=100, initialization_type='random', exponent_W=0.55,
-                 global_mean_input_is_zero=True, use_data_for_decoding=False, orthogonalize_input_means=True,
+                 global_mean_input_is_zero=True, use_data_for_decoding=False, orthogonalize_input_means=True, do_z_score=False,
                  rng_seed=1, sparsity_factor=1):
         self.size = size
         self.input_size, self.network_size, self.output_size = size
@@ -88,12 +88,15 @@ class ToyNetwork:
         self.sparsity_factor = sparsity_factor
         self.orthogonalize_input_means = orthogonalize_input_means
         self.P = None  # inverse correlation matrix
+        self.do_z_score = do_z_score
 
         # BCI decoder attributes
         self.decoder = None  # sklearn LinearModel object
         self.C = None  # projection matrix, shape = (intrinsic_manifold_dim, self.network_size)
         self.D = None  # decoding matrix, shape = (self.output_size, intrinsic_manifold_dim)
         self.intercept = np.zeros(self.output_size)  # intercept of the decoder
+        self.inv_Sv = np.eye(size[1])
+        self.inv_Sz = None
 
         # Input generator
         self.input_noise = self.create_input()
@@ -139,9 +142,12 @@ class ToyNetwork:
     def create_input(self):
         if self.nb_inputs == self.input_size and self.input_noise_intensity < 1e-6:
             # 1-of-K encoding
-            means = [np.zeros(self.input_size) for i in range(self.nb_inputs)]
+            if self.global_mean_input_is_zero:
+                means = [-np.ones(self.input_size) / self.nb_inputs for i in range(self.nb_inputs)]
+            else:
+                means = [np.zeros(self.input_size) for i in range(self.nb_inputs)]
             for i in range(self.nb_inputs):
-                means[i][i] = 1.
+                means[i][i] = 1. + means[i][i]
             covs = [np.zeros((self.input_size, self.input_size))] * self.nb_inputs
         else:
             # Means
@@ -200,7 +206,6 @@ class ToyNetwork:
         b = np.zeros(self.network_size)
 
         return U, W, V, b
-
 
     # -------------------------- Loss-related functions -------------------------- #
     def loss_function(self):
@@ -795,6 +800,11 @@ class ToyNetwork:
                                      np.outer(conditioned_means[k] - global_mean, conditioned_means[k] - global_mean))
         return total_covariance
 
+    def compute_total_correlation(self):
+        var = self.compute_total_covariance()
+        self.inv_Sv = np.diag(np.sqrt(np.diag(var))**-1)
+        return self.inv_Sv@var@self.inv_Sv
+
     def compute_total_input_covariance(self):
         """
         Compute V[x].
@@ -913,24 +923,19 @@ class ToyNetwork:
             plt.close()
 
     # -------------------------- Decoder-related member functions -------------------------- #
-    def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.99, nb_trials=50):
-        tot_var = self.compute_total_covariance()
+    def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.95, nb_trials=50):
+        tot_var = self.compute_total_correlation() if self.do_z_score else self.compute_total_covariance()
         _, s, vt = np.linalg.svd(tot_var)
-        '''
-        plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']))
-        plt.plot(100 * np.cumsum(s)/np.trace(tot_var))
-        plt.xlabel("Ranked eigenvalues")
-        plt.ylabel("Cumulative variance (%)")
-        plt.tight_layout()
-        plt.show()
-        '''
+
         dim = self.dimensionality(threshold=threshold)
         print('Number of PCs for {} of total variance = {}'.format(threshold, dim))
         if intrinsic_manifold_dim is None:
             intrinsic_manifold_dim = dim
 
-        # Projection matrix
-        self.C = vt[:intrinsic_manifold_dim, :]
+        self.C = vt[:intrinsic_manifold_dim, :]  # projection matrix
+        self.inv_Sz = np.diag(np.sqrt(np.diag(self.C @ tot_var @ self.C.T)) ** -1) if self.do_z_score else np.eye(
+            intrinsic_manifold_dim)
+        C_loc = self.inv_Sz @ self.C @ self.inv_Sv
 
         if self.use_data_for_decoding:
             # Fit decoder using samples
@@ -955,20 +960,10 @@ class ToyNetwork:
             self.V = self.D @ self.C
             #self.intercept = -self.V @ self.sample_mean_v
         else:
-            # Find best fit by minimizing |V - DC|^2 wrt D
-            def loss(dec_mat, corr_mat):
-                #return np.linalg.norm(self.V - dec_mat @ self.C)**2 / (self.output_size * self.network_size)
-                return np.trace((self.V - dec_mat @ self.C)@corr_mat@(self.V - dec_mat @ self.C).T)
             Var = self.compute_total_covariance()
             vbarvbarT = np.outer(self.get_mean_activity(), self.get_mean_activity())
-            #D = 0.2*self.rng.normal(size=(self.output_size, intrinsic_manifold_dim))
-            #for i in range(int(2e2)):
-            #    if i % 10 == 0:
-            #        print(loss(D, Var + vbarvbarT))
-            #    D += 2e-3 * (self.V - D@self.C) @ (Var + vbarvbarT) @ self.C.T
-            #self.D = D
-            self.D = self.V @ (Var + vbarvbarT) @ self.C.T @ np.linalg.inv(self.C @ (Var + vbarvbarT) @ self.C.T)
-            self.V = self.D @ self.C
+            self.D = self.V @ (Var + vbarvbarT) @ C_loc.T @ np.linalg.inv(C_loc @ (Var + vbarvbarT) @ C_loc.T)
+            self.V = self.D @ C_loc
             #self.intercept = -self.V @ self.get_mean_activity()
         return intrinsic_manifold_dim, dim
 
@@ -990,13 +985,13 @@ class ToyNetwork:
                 indices = np.arange(intrinsic_manifold_dim)
                 self.rng.shuffle(indices)
                 perm = indices
-                self.V = self.D @ self.C[perm, :]
+                self.V = self.D[:, perm] @ self.inv_Sz @ self.C @ self.inv_Sv
                 wm_losses[perm_counter] = self.loss_for_each_target()
                 wm_permutations[perm_counter] = perm
                 wm_total_losses.append(self.loss_function())
         else:  # comb over all possible permutations
             for perm_counter, perm in enumerate(itertools.permutations(range(intrinsic_manifold_dim))):
-                self.V = self.D @ self.C[perm, :]
+                self.V = self.D[:, perm] @ self.inv_Sz @ self.C @ self.inv_Sv
                 wm_losses[perm_counter] = self.loss_for_each_target()
                 wm_permutations[perm_counter] = perm
                 wm_total_losses.append(self.loss_function())
@@ -1004,7 +999,7 @@ class ToyNetwork:
         print(f"Median target-wise loss for WM perturbation : {np.median(wm_losses, axis=0)}")
 
         # OM
-        self.V = self.D @ self.C
+        self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
         mds = self.get_modulation_depth()
         sorted_indices = np.argsort(mds)
         indices_to_permute = sorted_indices[-nb_om_permuted_units:]
@@ -1014,13 +1009,13 @@ class ToyNetwork:
             self.rng.shuffle(indices)
             indices_i = np.arange(self.network_size)
             indices_i[indices_to_permute] = indices
-            self.V = self.D @ self.C[:, indices_i]
+            self.V = self.D @ self.inv_Sz @ self.C[:, indices_i] @ self.inv_Sv
             om_losses[perm_counter] = self.loss_for_each_target()
             om_total_losses.append(self.loss_function())
             om_permutations[perm_counter] = indices_i
 
         # Return to original mapping
-        self.V = self.D @ self.C
+        self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
 
         # Compute median target-specific losses across all WM and OM permutations
         #median_per_target_loss = np.median(wm_losses, axis=0, keepdims=True)
@@ -1036,6 +1031,13 @@ class ToyNetwork:
         selected_om = om_permutations[np.argmin(normed_diff)]
         self.selected_permutation_OM = np.asarray(selected_om, dtype=int)
         return self.selected_permutation_WM, self.selected_permutation_OM, wm_total_losses, om_total_losses
+
+    def apply_wm_perturb(self, selected_wm):
+        self.V = self.D[:, selected_wm] @ self.inv_Sz @ self.C @ self.inv_Sv
+
+    def apply_om_perturb(self, selected_om):
+        self.V = self.D @ self.inv_Sz @ self.C[:, selected_om] @ self.inv_Sv
+
 
     def wm_perturb(self, intrinsic_manifold_dim, nb_samples=200, target_loss=None):
         all_losses = []  # contains list of target-specific losses

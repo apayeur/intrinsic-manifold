@@ -9,16 +9,16 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 100, 2)              # (input size, recurrent size, output size)
+    size = (8, 100, 2)              # (input size, recurrent size, output size)
     input_noise_intensity = 0e-4    # set to zero for 1-of-K encoding
     private_noise_intensity = 1e-2
     intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
     lr_init = (0, 1e-2, 0)          # learning rate for initial training
     lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
-    lrs = [0.001]  # learning rate during adaptation
+    lrs = [0.0005]  # learning rate during adaptation
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(2e3)        # nb of gradient iteration during adaptation
-    seeds = np.arange(20, dtype=int)
+    seeds = np.arange(5, dtype=int)
     relearn_after_decoder_fitting = False
     exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
     do_scale_V_OM = False
@@ -27,7 +27,7 @@ def main():
         for lr in lrs:
             lr_adapt = (0, lr, 0)  # was lr/15
             # Manage save and load folders
-            tag = f"fig2-exponent_W{exponent_W}"  # identification of this experiment, for bookkeeping
+            tag = f"fig2-8targets_W{exponent_W}"  # identification of this experiment, for bookkeeping
             #tag = f"zeroInitW-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-real-dims"
             save_dir = f"data/egd/{tag}"
             save_dir_results = f"results/egd/{tag}"
@@ -116,7 +116,7 @@ def main():
                                   private_noise_intensity=private_noise_intensity,
                                   input_subspace_dim=0, nb_inputs=size[0],
                                   use_data_for_decoding=False,
-                                  global_mean_input_is_zero=False,
+                                  global_mean_input_is_zero=False, do_z_score=False,
                                   initialization_type='random', exponent_W=exponent_W,
                                   rng_seed=seed)
 
@@ -157,7 +157,7 @@ def main():
                 print('\n|-------------------------------- WM perturbation --------------------------------|')
                 net_wm = copy.deepcopy(net2)
                 net_wm.network_name = 'wm'
-                net_wm.V = net_wm.D @ net_wm.C[selected_wm, :]
+                net_wm.apply_wm_perturb(selected_wm)  # apply WM perturbation
                 output_matrix_angles['WM'][seed_id] = np.rad2deg(subspace_angles(V_0.T, net_wm.V.T))
 
                 squared_mean_output_radius_WM = net_wm.mean_output_square_radius()
@@ -195,7 +195,7 @@ def main():
                 print('\n|-------------------------------- OM perturbation --------------------------------|')
                 net_om = copy.deepcopy(net2)
                 net_om.network_name = 'om'
-                net_om.V = net_om.D @ net_om.C[:, selected_om]
+                net_om.apply_om_perturb(selected_om)  # apply OM perturbation
                 squared_mean_output_radius_OM = net_om.mean_output_square_radius()
                 scale_OM = np.sqrt(squared_mean_output_radius_WM / squared_mean_output_radius_OM) if do_scale_V_OM else 1.
                 net_om.V = scale_OM * net_om.V

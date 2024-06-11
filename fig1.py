@@ -9,22 +9,22 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 100, 2)              # (input size, recurrent size, output size)
+    size = (8, 100, 2)              # (input size, recurrent size, output size)
     input_noise_intensity = 0e-4    # set to zero for 1-of-K encoding
     private_noise_intensity = 1e-2
-    intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
+    intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     lr_init = (0, 1e-2, 0)          # learning rate for initial training
     lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
     lr = 0.001                      # learning rate during adaptation
     lr_adapt = (0, lr, 0)
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
-    seed = 0
+    seed = 1
     relearn_after_decoder_fitting = False
     exponent_W = 0.55               # W_0 ~ N(0, 1/N^exponent_W) -- in the lazy regime for Fig. 1
 
     # Manage save and load folders
-    tag = f"fig1"
+    tag = f"fig1-8targets"
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -39,7 +39,7 @@ def main():
                       input_subspace_dim=0, nb_inputs=size[0],
                       use_data_for_decoding=False,
                       global_mean_input_is_zero=False,
-                      initialization_type='random', exponent_W=exponent_W,
+                      initialization_type='random', exponent_W=exponent_W, do_z_score=False,
                       rng_seed=seed)
 
     l, _, _, _, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
@@ -48,8 +48,7 @@ def main():
 
     print('\n|-------------------------------- Fit decoder --------------------------------|')
     net1 = copy.deepcopy(net0)
-    intrinsic_manifold_dim, _ = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
-                                                                  threshold=0.95)
+    intrinsic_manifold_dim, _ = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim, threshold=0.95)
     net1.network_name = 'fitted'
     net1.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting.{output_fig_format}")
 
@@ -68,7 +67,7 @@ def main():
     print('\n|-------------------------------- WM perturbation --------------------------------|')
     net_wm = copy.deepcopy(net2)
     net_wm.network_name = 'wm'
-    net_wm.V = net_wm.D @ net_wm.C[selected_wm, :]  # apply WM perturbation
+    net_wm.apply_wm_perturb(selected_wm)  # apply WM perturbation
 
     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMBeforeLearning.{output_fig_format}")
 
@@ -79,7 +78,7 @@ def main():
     print('\n|-------------------------------- OM perturbation --------------------------------|')
     net_om = copy.deepcopy(net2)
     net_om.network_name = 'om'
-    net_om.V = net_om.D @ net_om.C[:, selected_om]  # apply OM perturbation
+    net_om.apply_om_perturb(selected_om)  # apply OM perturbation
 
     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMBeforeLearning.{output_fig_format}")
 
