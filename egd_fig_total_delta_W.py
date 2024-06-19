@@ -8,12 +8,12 @@ plt.style.use('rnn4bci_plot_params.dms')
 Plot of $\Delta W$ across learning for rich and lazy regime (Fig. 2F).
 """
 
-save_fig_dir = f"results/egd/rich_vs_lazy"
+save_fig_dir = f"results/egd/nonlinear"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
-delta_W_lazy = np.load("data/egd/fig2-exponent_W0.55/total_change_W_Fnorm.npy", allow_pickle=True).item()
-delta_W_rich = np.load("data/egd/fig2-exponent_W1.0/total_change_W_Fnorm.npy", allow_pickle=True).item()
+delta_W_lazy = np.load("data/egd/fig2-nonlinear-test3_W0.55/total_change_W_Fnorm.npy", allow_pickle=True).item()
+delta_W_rich = np.load("data/egd/fig2-nonlinear-test3_W1.0/total_change_W_Fnorm.npy", allow_pickle=True).item()
 
 data = []
 data.append(delta_W_lazy['WM'])

@@ -6,7 +6,7 @@ plt.style.use('rnn4bci_plot_params.dms')
 
 exponent_W = 0.55
 #file_suffix = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
-tag = f"fig2-exponent_W{exponent_W}"
+tag = f"fig2-nonlinear-test3_W{exponent_W}"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
 
@@ -36,10 +36,9 @@ elif exponent_W == 1:
     plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
 #plt.xlim([0, len(m_wm)])
 plt.xticks([0, len(m_wm)])
-plt.ylim([0, 5])
-#plt.ylim(ymax=15)
-plt.yticks([0, 5])
-plt.gca().set_yticklabels(['0.0', '5.0'])
+plt.ylim([0, 1])  # plt.ylim([0, 5])
+plt.yticks([0, 1])  # plt.yticks([0, 5])
+#plt.gca().set_yticklabels(['0.0', '5.0'])
 plt.xlabel('Weight update post-perturb.')
 #plt.ylabel(r'$\|\nabla_W L\|_F$')
 plt.ylabel("Gradient norm")

@@ -5,13 +5,13 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55, 1.0] #, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.55] #, 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-8targets_W{exponent_W}"
+    tag = f"fig2-largerN-test_W{exponent_W}"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -26,28 +26,30 @@ for exponent_W in exponents_W:
     print("Nb of unstable seeds WM", nb_unstable_seed_WM)
     print("Nb of unstable seeds OM", nb_unstable_seed_WM)
     """
-
-    seeds_to_exclude =[]
     params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
-    seeds_to_include = [i for i in range(params['nb_seeds']) if i not in seeds_to_exclude]
 
     loss_dict = np.load(f"{load_dir}/loss.npy", allow_pickle=True).item()
     loss = loss_dict['loss']
     loss_init = loss_dict['loss_init']
-    loss_var = loss_dict['loss_var']
-    loss_exp = loss_dict['loss_exp']
+    #loss_var = loss_dict['loss_var']
+    #loss_exp = loss_dict['loss_exp']
     loss_corr = loss_dict['loss_corr']
-    loss_proj = loss_dict['loss_proj']
-    loss_vbar = loss_dict['loss_vbar']
+    #loss_proj = loss_dict['loss_proj']
+    #loss_vbar = loss_dict['loss_vbar']
+
+    seeds_to_exclude = np.where(np.sum(loss['OM'] < 0, axis=1) > 0)[0]
+    print('seeds to exclude : ', seeds_to_exclude)
+
+    seeds_to_include = [i for i in range(params['nb_seeds']) if i not in seeds_to_exclude]
 
     loss_init = loss_init[seeds_to_include]
     for perturbation_type in ['WM', 'OM']:
         loss[perturbation_type] = loss[perturbation_type][seeds_to_include]
-        loss_var[perturbation_type] = loss_var[perturbation_type][seeds_to_include]
-        loss_exp[perturbation_type] = loss_exp[perturbation_type][seeds_to_include]
+        #loss_var[perturbation_type] = loss_var[perturbation_type][seeds_to_include]
+        #loss_exp[perturbation_type] = loss_exp[perturbation_type][seeds_to_include]
         loss_corr[perturbation_type] = loss_corr[perturbation_type][seeds_to_include]
-        loss_proj[perturbation_type] = loss_proj[perturbation_type][seeds_to_include]
-        loss_vbar[perturbation_type] = loss_vbar[perturbation_type][seeds_to_include]
+        #loss_proj[perturbation_type] = loss_proj[perturbation_type][seeds_to_include]
+        #loss_vbar[perturbation_type] = loss_vbar[perturbation_type][seeds_to_include]
 
     nb_iter = params['nb_iter']
     nb_iter_adapt = params['nb_iter_adapt']
@@ -99,15 +101,15 @@ for exponent_W in exponents_W:
         if plot_relative_loss:
             perf = loss[perturbation_type] / loss[perturbation_type][:,0:1]
             print(perf.shape)
-            print(f"Loss {perturbation_type} at update 150", np.mean(perf[:, 150]),
-                  "+/-", 2*np.std(perf[:, 150], ddof=1)/perf.shape[0]**0.5)
-            print(f"Loss {perturbation_type} at update 67", np.mean(perf[:, 67]),
-                  "+/-", 2*np.std(perf[:, 67], ddof=1)/perf.shape[0]**0.5)
+            # print(f"Loss {perturbation_type} at update 150", np.mean(perf[:, 150]),
+            #       "+/-", 2*np.std(perf[:, 150], ddof=1)/perf.shape[0]**0.5)
+            # print(f"Loss {perturbation_type} at update 67", np.mean(perf[:, 67]),
+            #       "+/-", 2*np.std(perf[:, 67], ddof=1)/perf.shape[0]**0.5)
         else:
             perf = loss[perturbation_type]
         m = np.mean(perf, axis=0)
         std = np.std(perf, axis=0, ddof=1)
-        plt.plot(np.arange(m.shape[0]), m, '-' if perturbation_type=='WM' else '--', label=perturbation_type,
+        plt.plot(np.arange(m.shape[0]), m, '-' if perturbation_type=='WM' else '--', label=f"{perturbation_type}, n = {loss[perturbation_type].shape[0]}",
                  color=col_w if perturbation_type=='WM' else col_o, lw=0.5)
         plt.fill_between(np.arange(m.shape[0]),
                          m- 2*std/loss['WM'].shape[0]**0.5,
@@ -125,19 +127,19 @@ for exponent_W in exponents_W:
         plt.gca().text(0.5, 0.9, 'Lazy', ha='center', va='center', transform=plt.gca().transAxes)
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
-    if exponent_W == 0.55:
-        plt.xlim([0, 500])
-        plt.xticks(plt.gca().get_xlim())
-    else:
-        plt.xlim([0, len(m)])
-        plt.xticks([0, len(m)])
+    # if exponent_W == 0.55:
+    #     plt.xlim([0, 500])
+    #     plt.xticks(plt.gca().get_xlim())
+    # else:
+    plt.xlim([0, len(m)])
+    plt.xticks([0, len(m)])
     plt.xlabel(x_label)
     plt.legend()
     plt.tight_layout()
     outfile_name = f'{save_fig_dir}/LossAdapt.{output_fig_format}' if not plot_relative_loss else f'{save_fig_dir}/LossAdaptRelative.{output_fig_format}'
     plt.savefig(outfile_name)
     plt.close()
-
+    """
     # Plot subsampled relative performance
     subsampling = nb_iter_adapt // nb_iter_adapt
     shift = nb_iter_adapt // 50  # for clearer plot
@@ -327,3 +329,4 @@ plt.legend()
 plt.tight_layout()
 plt.savefig(f'{save_fig_dir}/DiffLoss.{output_fig_format}')
 plt.close()
+"""
