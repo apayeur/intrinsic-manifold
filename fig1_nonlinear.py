@@ -17,12 +17,12 @@ output_fig_format = 'png'
 # Parameters
 size = (6, 100, 2)              # (input size, recurrent size, output size)
 intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
-lr_init = 5e-2 #3e-2                  # learning rate for initial training
+lr_init = 1e-2 #3e-2                  # learning rate for initial training
 lr_decod = lr_init / 2
-lr = 2e-3 #0.1e-2                       # learning rate during adaptation
-nb_iter = int(2e2)              # nb of gradient iteration during initial training
-nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
-seed = 1
+lr = 1e-3 #0.1e-2                       # learning rate during adaptation
+nb_iter = int(1e2)              # nb of gradient iteration during initial training
+nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
+seed = 0
 exponent_W = 0.55        # W_0 ~ N(0, 1/N^exponent_W)
 activation_function = 'linear'
 
@@ -36,6 +36,7 @@ net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], ex
                                      global_mean_input_is_zero=global_mean_input_is_zero,
                                      do_z_score=do_z_score, rng_seed=seed,
                                      activation_function=activation_function)
+
 data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
 net0.plot_output(outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
 print("Max abs eigvals W = ", np.max(np.abs(np.linalg.eigvals(net0.W))))
@@ -62,7 +63,7 @@ selected_wm, selected_om, wm_t_l, om_t_l = \
 wm_total_losses, om_total_losses = wm_t_l, om_t_l
 
 print('\n|-------------------------------- WM perturbation --------------------------------|')
-"""net_wm = copy.deepcopy(net2)
+net_wm = copy.deepcopy(net2)
 net_wm.apply_wm_perturb(selected_wm)  # apply WM perturbation
 
 net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMBeforeLearning_seed{seed}.{output_fig_format}")
@@ -70,9 +71,9 @@ net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMBeforeLearning_seed
 _ = net_wm.train(lr=lr, nb_iter=nb_iter_adapt)
 
 net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMAfterLearning_seed{seed}.{output_fig_format}")
-"""
+
 print('\n|-------------------------------- OM perturbation --------------------------------|')
-"""net_om = copy.deepcopy(net2)
+net_om = copy.deepcopy(net2)
 net_om.apply_om_perturb(selected_om)  # apply OM perturbation
 
 net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMBeforeLearning_seed{seed}.{output_fig_format}")
@@ -80,7 +81,7 @@ net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMBeforeLearning_seed
 _ = net_om.train(lr=lr, nb_iter=nb_iter_adapt)
 
 net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMAfterLearning_seed{seed}.{output_fig_format}")
-"""
+
 # Save candidate perturbations losses
 np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
 np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)

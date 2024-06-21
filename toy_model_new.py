@@ -104,10 +104,9 @@ class NonlinearDeterministicNetwork:
     def conditioned_potentials(self):
         """Solve F(v) = v - Wf(v) + Ux"""
         cps = []
-        for k in range(self.nb_inputs):
-            initial_value = self.prev_potentials[k]
-            if self.activation_function != 'linear':
-                sol, _, ier, _ = fsolve(self.F, initial_value,
+        if self.activation_function != 'linear':
+            for k in range(self.nb_inputs):
+                sol, _, ier, _ = fsolve(self.F, self.prev_potentials[k],
                                         args=(self.W, self.U@self.inputs[k]+self.b, self.activation_function), fprime=self.dF,
                                         full_output=True)
                 if ier:
@@ -116,8 +115,10 @@ class NonlinearDeterministicNetwork:
 
                 else:
                     raise Exception("Root not found")
-            else:
-                cps.append(self.inv_I_minus_W()@(self.U@self.inputs[k]+self.b))
+        else:
+            Q = self.inv_I_minus_W()
+            for k in range(self.nb_inputs):
+                cps.append(Q@(self.U@self.inputs[k]+self.b))
         return cps
 
     def conditioned_activities(self):
@@ -140,7 +141,6 @@ class NonlinearDeterministicNetwork:
     def activity_correlation(self):
         return self.activity_covariance() + np.outer(self.mean_activity(), self.mean_activity())
 
-
     # ==============  Loss ================
     def task_loss(self):
         rates = self.conditioned_activities()
@@ -156,7 +156,7 @@ class NonlinearDeterministicNetwork:
         for k in range(self.nb_inputs):
             error = self.V @ rates[k] - self.targets[k]
             losses[k] = 0.5 * np.dot(error, error)
-        return losses
+        return losses / self.nb_inputs
 
     def correlation_component_loss(self):
         """TODO: Check if formula still valid with nonlinearity."""
@@ -167,16 +167,22 @@ class NonlinearDeterministicNetwork:
     # =========  Training ==========
     def compute_gradient(self):
         potentials = self.conditioned_potentials()
-
-        grad = np.zeros_like(self.W)
-        for k in range(self.nb_inputs):
-            J = self.phi_jac(potentials[k])
-            error = self.V @ self.phi(potentials[k]) - self.targets[k]
-            grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
-        grad /= self.nb_inputs
+        if self.activation_function != 'linear':
+            grad = np.zeros_like(self.W)
+            for k in range(self.nb_inputs):
+                J = self.phi_jac(potentials[k])
+                error = self.V @ self.phi(potentials[k]) - self.targets[k]
+                grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
+            grad /= self.nb_inputs
+        else:
+            grad = np.zeros_like(self.W)
+            for k in range(self.nb_inputs):
+                error = self.V @ potentials[k] - self.targets[k]
+                grad += self.V.T @ np.outer(error, potentials[k])
+            grad = self.inv_I_minus_W() @ grad / self.nb_inputs
         ng = np.linalg.norm(grad)
         threshold = 1.
-        #grad = threshold*grad/ng if ng >= threshold else grad  # gradient clipping
+        # grad = threshold*grad/ng if ng >= threshold else grad  # gradient clipping
         return grad
 
     def train(self, lr=1.e-2, nb_iter=int(1e3), stopping_crit=None, do_record_data=True):
@@ -340,6 +346,9 @@ class NonlinearDeterministicNetwork:
                 wm_total_losses.append(self.task_loss())
         else:  # comb over all possible permutations
             for perm_counter, perm in enumerate(itertools.permutations(range(intrinsic_manifold_dim))):
+                #print(perm, ":", self.task_loss())
+                #print(self.D)
+                #print('\n')
                 self.V = self.D[:, perm] @ self.inv_Sz @ self.C @ self.inv_Sv
                 wm_losses[perm_counter] = self.loss_for_each_target()
                 wm_permutations[perm_counter] = perm
@@ -362,13 +371,15 @@ class NonlinearDeterministicNetwork:
             om_losses[perm_counter] = self.loss_for_each_target()
             om_total_losses.append(self.task_loss())
             om_permutations[perm_counter] = indices_i
+        print(f"\nMedian total loss for OM perturbation : {np.median(om_total_losses)}")
+        print(f"Median target-wise loss for OM perturbation : {np.median(om_losses, axis=0)}")
 
         # Return to original mapping
         self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
 
         # Compute median target-specific losses across all WM and OM permutations
         median_per_target_loss = np.median(np.vstack((wm_losses, om_losses)), axis=0, keepdims=True)
-        print(f'Combined median per-target loss = {median_per_target_loss}')
+        print(f'\nCombined median per-target loss = {median_per_target_loss}')
 
         # Find WM and OM permutations closest to median WM perturbations
         normed_diff = np.linalg.norm(wm_losses - median_per_target_loss, axis=1)

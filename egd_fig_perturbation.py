@@ -12,7 +12,7 @@ plt.style.use('rnn4bci_plot_params.dms')
 
 exponent_W = 0.55
 #tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
-tag = "fig1-TEST"
+tag = "fig1-test-nonlinear"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):
