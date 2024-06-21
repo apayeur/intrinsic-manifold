@@ -9,22 +9,22 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (8, 100, 2)              # (input size, recurrent size, output size)
+    size = (6, 100, 2)              # (input size, recurrent size, output size)
     input_noise_intensity = 0e-4    # set to zero for 1-of-K encoding
-    private_noise_intensity = 1e-2
-    intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
-    lr_init = (0, 1e-2, 0)          # learning rate for initial training
+    private_noise_intensity = 0 # 1e-2
+    intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
+    lr_init = (0, 5e-2, 0) # (0, 1e-2, 0)          # learning rate for initial training
     lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
     lr = 0.001                      # learning rate during adaptation
     lr_adapt = (0, lr, 0)
-    nb_iter = int(5e2)              # nb of gradient iteration during initial training
+    nb_iter = int(2e2) #int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seed = 1
     relearn_after_decoder_fitting = False
     exponent_W = 0.55               # W_0 ~ N(0, 1/N^exponent_W) -- in the lazy regime for Fig. 1
 
     # Manage save and load folders
-    tag = f"fig1-8targets"
+    tag = f"fig1-TEST"
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):
@@ -61,11 +61,11 @@ def main():
 
     print('\n|-------------------------------- Select perturbations --------------------------------|')
     selected_wm, selected_om, wm_t_l, om_t_l = \
-        net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1])
+        net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1], nb_samples=int(1e3))
     wm_total_losses, om_total_losses = wm_t_l, om_t_l
 
     print('\n|-------------------------------- WM perturbation --------------------------------|')
-    net_wm = copy.deepcopy(net2)
+    """net_wm = copy.deepcopy(net2)
     net_wm.network_name = 'wm'
     net_wm.apply_wm_perturb(selected_wm)  # apply WM perturbation
 
@@ -74,9 +74,9 @@ def main():
     l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, _, _, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
-
+"""
     print('\n|-------------------------------- OM perturbation --------------------------------|')
-    net_om = copy.deepcopy(net2)
+    """net_om = copy.deepcopy(net2)
     net_om.network_name = 'om'
     net_om.apply_om_perturb(selected_om)  # apply OM perturbation
 
@@ -85,7 +85,7 @@ def main():
     l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")
-
+    """
     # Save candidate perturbations losses
     np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
     np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)

@@ -12,7 +12,7 @@ plt.style.use('rnn4bci_plot_params.dms')
 
 exponent_W = 0.55
 #tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
-tag = "fig1"
+tag = "fig1-TEST"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):
@@ -28,8 +28,8 @@ plt.hist(om, bins=100, label='OM', color=col_o, alpha=0.5)
 plt.gca().axvline(median_, color='grey', lw=0.5, label='combined\nmedian')
 plt.xlabel('Loss')
 plt.ylabel('Count')
-plt.xticks([0, 0.5, 1])
-plt.yticks([0, 100, 200, 300])
+#plt.xticks([0, 0.5, 1])
+#plt.yticks([0, 100, 200, 300])
 plt.legend(fontsize=5)
 plt.tight_layout()
 despine(trim=True)

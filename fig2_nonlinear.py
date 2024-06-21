@@ -35,13 +35,13 @@ def main():
 
     relearn_after_decoder_fitting = True
     do_record_data = True
-    do_z_score = False
+    do_z_score = True
     global_mean_input_is_zero = False
     fit_intercept = True
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = (f"fig2-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+        tag = (f"fig2-TEST-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
                f"-fitinter{fit_intercept}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"

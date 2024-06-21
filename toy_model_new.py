@@ -7,29 +7,13 @@ import sklearn.linear_model as lm
 from numba import njit
 from utils import target_colors, gram_schmidt, principal_angles, units_convert
 from numba.typed import List as nbList
+import activation_functions
 import copy
 import itertools
 from math import factorial
 from scipy.linalg import subspace_angles
 from scipy.optimize import fsolve
 from sklearn.linear_model import LinearRegression
-
-def relu(x):
-    return 0.5 * (x + np.abs(x))
-def relu_prime(x):
-    return x > 0.
-def tanh_prime(x):
-    return 1 - np.tanh(x)**2
-def relu_jac(x):
-    return np.diag(relu_prime(x))
-def tanh_jac(x):
-    return np.diag(tanh_prime(x))
-def identity(x):
-    return x
-def identity_prime(x):
-    return np.ones_like(x)
-def identity_jac(x):
-    return np.diag(identity_prime(x))
 
 
 class NonlinearDeterministicNetwork:
@@ -44,18 +28,18 @@ class NonlinearDeterministicNetwork:
         self.activation_function = activation_function
         if activation_function == 'tanh':
             self.phi = np.tanh
-            self.phi_prime = tanh_prime
-            self.phi_jac = tanh_jac
+            self.phi_prime = activation_functions.tanh_prime
+            self.phi_jac = activation_functions.tanh_jac
         elif activation_function == 'relu':
-            self.phi = relu
-            self.phi_prime = relu_prime
-            self.phi_jac = relu_jac
-        elif activation_function == 'identity':
-            self.phi = identity
-            self.phi_prime = identity_prime
-            self.phi_jac = identity_jac
+            self.phi = activation_functions.relu
+            self.phi_prime = activation_functions.relu_prime
+            self.phi_jac = activation_functions.relu_jac
+        elif activation_function == 'linear':
+            self.phi = activation_functions.linear
+            self.phi_prime = activation_functions.linear_prime
+            self.phi_jac = activation_functions.linear_jac
         else:
-            raise ValueError("`activation_function` must be 'tanh', 'relu' or 'identity'")
+            raise ValueError("`activation_function` must be 'tanh', 'relu' or 'linear'")
 
         # BCI decoder attributes
         self.decoder = None  # sklearn LinearModel object
@@ -64,7 +48,7 @@ class NonlinearDeterministicNetwork:
         self.intercept = np.zeros(self.output_size)  # intercept of the decoder
         self.inv_Sv = np.eye(self.network_size)  # matrix for z-scoring activity
         self.inv_Sz = None # matrix for z-scoring PCs
-        self.m_z = np.zeros(self.network_size)
+        self.ma_0 = np.zeros(self.network_size)
 
         # Targets
         self.targets = [np.array([np.cos(2 * np.pi * i / self.nb_inputs),
@@ -95,33 +79,34 @@ class NonlinearDeterministicNetwork:
         V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / self.network_size) ** 0.5
         return U, W, V, b
 
-    # ==============  Statistics  ==================à
+    # ============= For activity solver =============
+    @staticmethod
+    def F(v, W, c, a_fun):
+        if a_fun == 'tanh':
+            return v - W @ np.tanh(v) + c
+        elif a_fun == 'relu':
+            return v - W @ activation_functions.relu(v) + c
+
+    @staticmethod
+    def dF(v, W, c, a_fun):
+        if a_fun == 'tanh':
+            return np.eye(W.shape[0]) - W @ activation_functions.tanh_jac(v)
+        elif a_fun == 'relu':
+            return np.eye(W.shape[0]) - W @ activation_functions.relu_jac(v)
+
+    # ==============  Statistics  ==================
     def inv_I_minus_W(self):
         return np.linalg.inv(np.eye(self.network_size) - self.W)
 
     def average_input(self):
         return np.mean(self.inputs, axis=0)
 
-    @staticmethod
-    def F(v, W, c, a_fun):
-        if a_fun == 'tanh':
-            return v - W @ np.tanh(v) + c
-        elif a_fun == 'relu':
-            return v - W @ relu(v) + c
-
-    @staticmethod
-    def dF(v, W, c, a_fun):
-        if a_fun == 'tanh':
-            return np.eye(W.shape[0]) - W @ np.diag((1 - np.tanh(v) **2))
-        elif a_fun == 'relu':
-            return np.eye(W.shape[0]) - W @ relu_jac(v)
-
     def conditioned_potentials(self):
         """Solve F(v) = v - Wf(v) + Ux"""
         cps = []
         for k in range(self.nb_inputs):
             initial_value = self.prev_potentials[k]
-            if self.activation_function != 'identity':
+            if self.activation_function != 'linear':
                 sol, _, ier, _ = fsolve(self.F, initial_value,
                                         args=(self.W, self.U@self.inputs[k]+self.b, self.activation_function), fprime=self.dF,
                                         full_output=True)
@@ -161,7 +146,7 @@ class NonlinearDeterministicNetwork:
         rates = self.conditioned_activities()
         L = 0.
         for k in range(self.nb_inputs):
-            error = self.V @ rates[k] + self.intercept - self.targets[k]
+            error = self.V @ rates[k] - self.targets[k]
             L += np.dot(error, error)
         return 0.5 * L / self.nb_inputs
 
@@ -169,11 +154,12 @@ class NonlinearDeterministicNetwork:
         losses = np.zeros(self.nb_inputs)
         rates = self.conditioned_activities()
         for k in range(self.nb_inputs):
-            error = self.V @ rates[k] + self.intercept - self.targets[k]
+            error = self.V @ rates[k] - self.targets[k]
             losses[k] = 0.5 * np.dot(error, error)
         return losses
 
     def correlation_component_loss(self):
+        """TODO: Check if formula still valid with nonlinearity."""
         ac = self.activity_covariance()
         ma = self.mean_activity()
         return 0.5 * np.trace(self.V @ (ac + np.outer(ma, ma)) @ self.V.T)
@@ -185,12 +171,12 @@ class NonlinearDeterministicNetwork:
         grad = np.zeros_like(self.W)
         for k in range(self.nb_inputs):
             J = self.phi_jac(potentials[k])
-            error = self.V @ self.phi(potentials[k]) + self.intercept - self.targets[k]
+            error = self.V @ self.phi(potentials[k]) - self.targets[k]
             grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
         grad /= self.nb_inputs
         ng = np.linalg.norm(grad)
         threshold = 1.
-        grad = threshold*grad/ng if ng >= threshold else grad
+        #grad = threshold*grad/ng if ng >= threshold else grad  # gradient clipping
         return grad
 
     def train(self, lr=1.e-2, nb_iter=int(1e3), stopping_crit=None, do_record_data=True):
@@ -299,6 +285,7 @@ class NonlinearDeterministicNetwork:
     def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False):
         tot_var = self.activity_correlation() if self.do_z_score else self.activity_covariance()
         _, s, vt = np.linalg.svd(tot_var)
+        evs = np.linalg.eigvals(tot_var)
 
         dim = self.dimensionality(threshold=threshold)
         print('Number of PCs for {} of total variance = {}'.format(threshold, dim))
@@ -309,16 +296,19 @@ class NonlinearDeterministicNetwork:
         self.inv_Sz = np.diag(np.sqrt(np.diag(self.C @ tot_var @ self.C.T)) ** -1) if self.do_z_score else np.eye(
             intrinsic_manifold_dim)
         C_loc = self.inv_Sz @ self.C @ self.inv_Sv
-        self.m_z = self.mean_activity() if self.do_z_score else np.zeros(self.network_size)
+        self.ma_0 = self.mean_activity() if self.do_z_score else np.zeros(self.network_size)
 
-        if fit_intercept:
+        if fit_intercept or self.do_z_score:
             lr = LinearRegression()
             ca = np.asarray(self.conditioned_activities())
-            lr.fit(ca @ C_loc.T, ca @ self.V.T)
+            lr.fit((ca - self.ma_0) @ C_loc.T, ca @ self.V.T)
             self.intercept = lr.intercept_
             self.D = lr.coef_
-            print("Fit R2:", lr.score(ca @ C_loc.T, ca @ self.V.T))
+            print("Fit R2:", lr.score((ca - self.ma_0) @ C_loc.T, ca @ self.V.T))
             print("D =", self.D)
+            target_shift = self.D @ C_loc @ self.ma_0 - self.intercept
+            for i in range(self.nb_inputs):
+                self.targets[i] += target_shift
         else:
             Var = self.activity_covariance()
             vbarvbarT = np.outer(self.mean_activity(), self.mean_activity())
@@ -438,11 +428,13 @@ class NonlinearDeterministicNetwork:
     def plot_output(self, outfile_name=None):
         plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
         rates = self.conditioned_activities()
+        original_targets = [np.array([np.cos(2 * np.pi * i / self.nb_inputs),
+                                      np.sin(2 * np.pi * i / self.nb_inputs)]) for i in range(self.nb_inputs)]
         for k in range(self.nb_inputs):
-            u = self.V @ rates[k] + self.intercept
+            u = self.V @ rates[k] - self.targets[k] + original_targets[k]
             plt.scatter(u[0], u[1], s=8,
                         facecolor=target_colors[k], edgecolors='white', lw=0.2, zorder=10)
-            plt.scatter(self.targets[k][0], self.targets[k][1], s=13,
+            plt.scatter(original_targets[k][0],  original_targets[k][1], s=13,
                         facecolor=target_colors[k], edgecolors='black', lw=0.4)
         plt.xticks([-2, 2])
         plt.yticks([-2, 2])
