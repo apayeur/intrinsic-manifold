@@ -4,9 +4,9 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponent_W = 0.55
+exponent_W = 1.
 #file_suffix = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
-tag = f"fig2-nonlinear-test3_W{exponent_W}"
+tag = f"fig2-test_W{exponent_W}"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
 

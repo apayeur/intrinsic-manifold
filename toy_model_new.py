@@ -24,6 +24,12 @@ def relu_jac(x):
     return np.diag(relu_prime(x))
 def tanh_jac(x):
     return np.diag(tanh_prime(x))
+def identity(x):
+    return x
+def identity_prime(x):
+    return np.ones_like(x)
+def identity_jac(x):
+    return np.diag(identity_prime(x))
 
 
 class NonlinearDeterministicNetwork:
@@ -44,6 +50,12 @@ class NonlinearDeterministicNetwork:
             self.phi = relu
             self.phi_prime = relu_prime
             self.phi_jac = relu_jac
+        elif activation_function == 'identity':
+            self.phi = identity
+            self.phi_prime = identity_prime
+            self.phi_jac = identity_jac
+        else:
+            raise ValueError("`activation_function` must be 'tanh', 'relu' or 'identity'")
 
         # BCI decoder attributes
         self.decoder = None  # sklearn LinearModel object
@@ -52,6 +64,7 @@ class NonlinearDeterministicNetwork:
         self.intercept = np.zeros(self.output_size)  # intercept of the decoder
         self.inv_Sv = np.eye(self.network_size)  # matrix for z-scoring activity
         self.inv_Sz = None # matrix for z-scoring PCs
+        self.m_z = np.zeros(self.network_size)
 
         # Targets
         self.targets = [np.array([np.cos(2 * np.pi * i / self.nb_inputs),
@@ -108,14 +121,18 @@ class NonlinearDeterministicNetwork:
         cps = []
         for k in range(self.nb_inputs):
             initial_value = self.prev_potentials[k]
-            sol, _, ier, _ = fsolve(self.F, initial_value,
-                                    args=(self.W, self.U@self.inputs[k]+self.b, self.activation_function), fprime=self.dF,
-                                    full_output=True)
-            if ier:
-                cps.append(sol)
-                self.prev_potentials[k] = sol
+            if self.activation_function != 'identity':
+                sol, _, ier, _ = fsolve(self.F, initial_value,
+                                        args=(self.W, self.U@self.inputs[k]+self.b, self.activation_function), fprime=self.dF,
+                                        full_output=True)
+                if ier:
+                    cps.append(sol)
+                    self.prev_potentials[k] = sol
+
+                else:
+                    raise Exception("Root not found")
             else:
-                raise Exception("Root not found")
+                cps.append(self.inv_I_minus_W()@(self.U@self.inputs[k]+self.b))
         return cps
 
     def conditioned_activities(self):
@@ -144,7 +161,7 @@ class NonlinearDeterministicNetwork:
         rates = self.conditioned_activities()
         L = 0.
         for k in range(self.nb_inputs):
-            error = self.V @ rates[k] - self.targets[k]
+            error = self.V @ rates[k] + self.intercept - self.targets[k]
             L += np.dot(error, error)
         return 0.5 * L / self.nb_inputs
 
@@ -152,7 +169,7 @@ class NonlinearDeterministicNetwork:
         losses = np.zeros(self.nb_inputs)
         rates = self.conditioned_activities()
         for k in range(self.nb_inputs):
-            error = self.V @ rates[k] - self.targets[k]
+            error = self.V @ rates[k] + self.intercept - self.targets[k]
             losses[k] = 0.5 * np.dot(error, error)
         return losses
 
@@ -168,7 +185,7 @@ class NonlinearDeterministicNetwork:
         grad = np.zeros_like(self.W)
         for k in range(self.nb_inputs):
             J = self.phi_jac(potentials[k])
-            error = self.V @ self.phi(potentials[k]) - self.targets[k]
+            error = self.V @ self.phi(potentials[k]) + self.intercept - self.targets[k]
             grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
         grad /= self.nb_inputs
         ng = np.linalg.norm(grad)
@@ -279,7 +296,7 @@ class NonlinearDeterministicNetwork:
         return data
 
     # ============ Methods related to decoder ==============
-    def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.95):
+    def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False):
         tot_var = self.activity_correlation() if self.do_z_score else self.activity_covariance()
         _, s, vt = np.linalg.svd(tot_var)
 
@@ -292,12 +309,21 @@ class NonlinearDeterministicNetwork:
         self.inv_Sz = np.diag(np.sqrt(np.diag(self.C @ tot_var @ self.C.T)) ** -1) if self.do_z_score else np.eye(
             intrinsic_manifold_dim)
         C_loc = self.inv_Sz @ self.C @ self.inv_Sv
+        self.m_z = self.mean_activity() if self.do_z_score else np.zeros(self.network_size)
 
-        Var = self.activity_covariance()
-        vbarvbarT = np.outer(self.mean_activity(), self.mean_activity())
-        self.D = self.V @ (Var + vbarvbarT) @ C_loc.T @ np.linalg.inv(C_loc @ (Var + vbarvbarT) @ C_loc.T)
+        if fit_intercept:
+            lr = LinearRegression()
+            ca = np.asarray(self.conditioned_activities())
+            lr.fit(ca @ C_loc.T, ca @ self.V.T)
+            self.intercept = lr.intercept_
+            self.D = lr.coef_
+            print("Fit R2:", lr.score(ca @ C_loc.T, ca @ self.V.T))
+            print("D =", self.D)
+        else:
+            Var = self.activity_covariance()
+            vbarvbarT = np.outer(self.mean_activity(), self.mean_activity())
+            self.D = self.V @ (Var + vbarvbarT) @ C_loc.T @ np.linalg.inv(C_loc @ (Var + vbarvbarT) @ C_loc.T)
         self.V = self.D @ C_loc
-        #self.intercept = -self.V @ self.get_mean_activity()
         return intrinsic_manifold_dim, dim
 
     def select_perturb(self, intrinsic_manifold_dim, nb_om_permuted_units=30, nb_samples=int(1e3)):
@@ -413,7 +439,7 @@ class NonlinearDeterministicNetwork:
         plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
         rates = self.conditioned_activities()
         for k in range(self.nb_inputs):
-            u = self.V @ rates[k]
+            u = self.V @ rates[k] + self.intercept
             plt.scatter(u[0], u[1], s=8,
                         facecolor=target_colors[k], edgecolors='white', lw=0.2, zorder=10)
             plt.scatter(self.targets[k][0], self.targets[k][1], s=13,

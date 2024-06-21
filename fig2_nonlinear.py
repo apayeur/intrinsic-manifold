@@ -17,25 +17,32 @@ do_record_data = True
 activation_function = 'tanh'
 """
 
+
 def main():
     output_fig_format = 'png'
 
     # Parameters
     size = (6, 100, 2)              # (input size, recurrent size, output size)
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
-    lr_init = 1e-1 #3e-2                  # learning rate for initial training
-    lr = 0.5e-2 #0.1e-2                       # learning rate during adaptation
-    nb_iter = int(1e2)              # nb of gradient iteration during initial training
-    nb_iter_adapt = int(2.5e2)        # nb of gradient iteration during adaptation
+    lr_init = 5e-2 #3e-2                  # learning rate for initial training
+    lr_decod = lr_init / 2
+    lr = 2e-3 #0.1e-2                       # learning rate during adaptation
+    nb_iter = int(2e2)              # nb of gradient iteration during initial training
+    nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
     seeds = np.arange(5, dtype=int)
-    relearn_after_decoder_fitting = True
-    exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
-    do_record_data = True
+    exponents_W = [0.5, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'relu'
+
+    relearn_after_decoder_fitting = True
+    do_record_data = True
+    do_z_score = False
+    global_mean_input_is_zero = False
+    fit_intercept = True
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = f"fig2-zero-mean-input-md-relu-exponentW{exponent_W}"  # identification of this experiment
+        tag = (f"fig2-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+               f"-fitinter{fit_intercept}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
         if not os.path.exists(save_dir):
@@ -116,7 +123,8 @@ def main():
             print(f'\n|==================================== Seed {seed} =====================================|')
             print('\n|-------------------------------- Initial training --------------------------------|')
             net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
-                                                 global_mean_input_is_zero=True, do_z_score=False, rng_seed=seed_id,
+                                                 global_mean_input_is_zero=global_mean_input_is_zero,
+                                                 do_z_score=do_z_score, rng_seed=seed_id,
                                                  activation_function=activation_function)
             data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
             ca = np.asarray(net0.conditioned_activities()).mean(axis=0)
@@ -136,20 +144,25 @@ def main():
             net1 = copy.deepcopy(net0)
             if do_record_data:
                 intrinsic_manifold_dim, real_dims[seed_id] = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
-                                                                              threshold=0.95)
+                                                                              threshold=0.95, fit_intercept=fit_intercept)
             else:
                 intrinsic_manifold_dim, _ = net1.fit_decoder(
                     intrinsic_manifold_dim=intrinsic_manifold_dim,
-                    threshold=0.95)
+                    threshold=0.95, fit_intercept=fit_intercept)
 
             net1.plot_output(outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting_seed{seed}.{output_fig_format}")
             V_0 = copy.deepcopy(net1.V)
+            print("Decoder intercept :", net1.intercept)
 
-            print('\n|-------------------------------- Re-training with decoder --------------------------------|')
+            '------------------------------------------- Retraining decoder -------------------------------------------'
             net2 = copy.deepcopy(net1)
             if relearn_after_decoder_fitting:
-                net2.train(lr=lr_init, nb_iter=nb_iter // 2)
-                net2.plot_output(outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder_seed{seed}.{output_fig_format}")
+                if net2.task_loss() > 1e-4:
+                    print(
+                        '\n|-------------------------------- Re-training with decoder --------------------------------|')
+                    print("task loss after initial training:", net2.task_loss())
+                    net2.train(lr=lr_decod, nb_iter=nb_iter // 2)
+                    net2.plot_output(outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder_seed{seed}.{output_fig_format}")
 
             print('\n|-------------------------------- Select perturbations --------------------------------|')
             selected_wm, selected_om, wm_t_l, om_t_l = \
