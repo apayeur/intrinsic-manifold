@@ -65,7 +65,7 @@ def main():
     wm_total_losses, om_total_losses = wm_t_l, om_t_l
 
     print('\n|-------------------------------- WM perturbation --------------------------------|')
-    """net_wm = copy.deepcopy(net2)
+    net_wm = copy.deepcopy(net2)
     net_wm.network_name = 'wm'
     net_wm.apply_wm_perturb(selected_wm)  # apply WM perturbation
 
@@ -74,9 +74,9 @@ def main():
     l, norm, a_min, a_max, nve, _, A_tmp, f_seed, _, _, _, _ = net_wm.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
     net_wm.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleWMAfterLearning.{output_fig_format}")
-"""
+
     print('\n|-------------------------------- OM perturbation --------------------------------|')
-    """net_om = copy.deepcopy(net2)
+    net_om = copy.deepcopy(net2)
     net_om.network_name = 'om'
     net_om.apply_om_perturb(selected_om)  # apply OM perturbation
 
@@ -85,7 +85,7 @@ def main():
     l, norm, a_min, a_max, nve, R_seed, _, f_seed, rel_proj_var_OM_seed, _, _, _ = net_om.train(lr=lr_adapt, nb_iter=nb_iter_adapt)
 
     net_om.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleOMAfterLearning.{output_fig_format}")
-    """
+
     # Save candidate perturbations losses
     np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
     np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)
