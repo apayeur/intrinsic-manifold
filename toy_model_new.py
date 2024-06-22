@@ -175,11 +175,10 @@ class NonlinearDeterministicNetwork:
                 grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
             grad /= self.nb_inputs
         else:
-            grad = np.zeros_like(self.W)
+            partial_grad = np.zeros_like(self.V)
             for k in range(self.nb_inputs):
-                error = self.V @ potentials[k] - self.targets[k]
-                grad += self.V.T @ np.outer(error, potentials[k])
-            grad = self.inv_I_minus_W() @ grad / self.nb_inputs
+                partial_grad += np.outer(self.V @ potentials[k] - self.targets[k], potentials[k])
+            grad = (self.V @ self.inv_I_minus_W()).T @ partial_grad / self.nb_inputs
         ng = np.linalg.norm(grad)
         threshold = 1.
         # grad = threshold*grad/ng if ng >= threshold else grad  # gradient clipping
@@ -211,6 +210,7 @@ class NonlinearDeterministicNetwork:
         # Learning
         i = 0
         loss = 1e9
+        initial_loss = self.task_loss()
         grad_norm = 0.
         while i < int(nb_iter) or loss > stopping_crit:
             var_prev = self.activity_covariance()
@@ -232,10 +232,10 @@ class NonlinearDeterministicNetwork:
 
             if nb_iter == 0:
                 if i % 500 == 0:
-                    print(f"Loss at iteration {i} = {loss}")
+                    print(f"Iteration {i:>4} : loss = {loss}  |  relative loss = {loss/initial_loss}")
             elif nb_iter > 5:
                 if i % (nb_iter // 5) == 0 or i == nb_iter - 1:
-                    print(f"Loss at iteration {i} = {loss}")
+                    print(f"Iteration {i:>4} : loss = {loss}  |  relative loss = {loss/initial_loss}")
 
             # Compute gradient
             g = self.compute_gradient()
@@ -304,21 +304,22 @@ class NonlinearDeterministicNetwork:
         C_loc = self.inv_Sz @ self.C @ self.inv_Sv
         self.ma_0 = self.mean_activity() if self.do_z_score else np.zeros(self.network_size)
 
-        if fit_intercept or self.do_z_score:
-            lr = LinearRegression()
+        if not fit_intercept and not self.do_z_score:
+            # Exact solution
+            Var = self.activity_covariance()
+            vbarvbarT = np.outer(self.mean_activity(), self.mean_activity())
+            self.D = self.V @ (Var + vbarvbarT) @ C_loc.T @ np.linalg.inv(C_loc @ (Var + vbarvbarT) @ C_loc.T)
+        else:
+            lr = LinearRegression(fit_intercept=fit_intercept)
             ca = np.asarray(self.conditioned_activities())
             lr.fit((ca - self.ma_0) @ C_loc.T, ca @ self.V.T)
-            self.intercept = lr.intercept_
+            self.intercept = lr.intercept_ if fit_intercept else np.zeros(self.output_size)
             self.D = lr.coef_
             print("Fit R2:", lr.score((ca - self.ma_0) @ C_loc.T, ca @ self.V.T))
             print("D =", self.D)
             target_shift = self.D @ C_loc @ self.ma_0 - self.intercept
             for i in range(self.nb_inputs):
                 self.targets[i] += target_shift
-        else:
-            Var = self.activity_covariance()
-            vbarvbarT = np.outer(self.mean_activity(), self.mean_activity())
-            self.D = self.V @ (Var + vbarvbarT) @ C_loc.T @ np.linalg.inv(C_loc @ (Var + vbarvbarT) @ C_loc.T)
         self.V = self.D @ C_loc
         return intrinsic_manifold_dim, dim
 
@@ -346,9 +347,6 @@ class NonlinearDeterministicNetwork:
                 wm_total_losses.append(self.task_loss())
         else:  # comb over all possible permutations
             for perm_counter, perm in enumerate(itertools.permutations(range(intrinsic_manifold_dim))):
-                #print(perm, ":", self.task_loss())
-                #print(self.D)
-                #print('\n')
                 self.V = self.D[:, perm] @ self.inv_Sz @ self.C @ self.inv_Sv
                 wm_losses[perm_counter] = self.loss_for_each_target()
                 wm_permutations[perm_counter] = perm

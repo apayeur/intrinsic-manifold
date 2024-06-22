@@ -17,9 +17,9 @@ def main():
     lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
     lr = 0.001                      # learning rate during adaptation
     lr_adapt = (0, lr, 0)
-    nb_iter = int(2e2) #int(5e2)              # nb of gradient iteration during initial training
+    nb_iter = int(1) #int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
-    seed = 1
+    seed = 0
     relearn_after_decoder_fitting = False
     exponent_W = 0.55               # W_0 ~ N(0, 1/N^exponent_W) -- in the lazy regime for Fig. 1
 
@@ -45,6 +45,7 @@ def main():
     l, _, _, _, _, _, _, _, _, _, _, _ = net0.train(lr=lr_init, nb_iter=nb_iter)
 
     net0.plot_sample(sample_size=1000, outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
+    print("Max abs eigvals W = ", np.max(np.abs(np.linalg.eigvals(net0.W))))
 
     print('\n|-------------------------------- Fit decoder --------------------------------|')
     net1 = copy.deepcopy(net0)

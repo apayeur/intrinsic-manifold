@@ -293,36 +293,18 @@ class ToyNetwork:
         Exps_given_k = self.get_conditioned_mean_activity()
         recast_op = np.linalg.inv(np.eye(self.network_size) - self.W.T) @ self.V.T
 
-        grad = {'U': np.zeros_like(self.U), 'W': np.zeros_like(self.W), 'b': np.zeros_like(self.b)}
+        partial_grad_U = np.zeros((self.output_size, self.input_size))
+        partial_grad_W = np.zeros((self.output_size, self.network_size))
+        partial_grad_b = np.zeros(self.output_size)
         for k, p in enumerate(self.input_noise.p):
             error_k = self.V @ Exps_given_k[k]-self.targets[k]
-            grad['U'] += p * recast_op @ (
+            partial_grad_U += p * (
                     self.V @ inv_I_minusW @ self.U @ self.input_noise.covs[k]
                     + np.outer(error_k, self.input_noise.means[k])
             )
-            grad['W'] += p * recast_op @ (self.V @ Vars_given_k[k] + np.outer(error_k, Exps_given_k[k]))
-            grad['b'] += p * recast_op @ error_k
-
-        """
-        grad = {'U': np.zeros_like(self.U.T), 'W': np.zeros_like(self.W), 'b': np.zeros_like(self.b)}
-        prefactors = {'(I-W).-TV.TV(I-W)^-1': np.transpose(np.linalg.inv(I - self.W)) @ self.V.T @ self.V @ np.linalg.inv(I - self.W),
-                      'V(I-W)^-1': self.V @ np.linalg.inv(I - self.W),
-                      '(I-W)^-1': np.linalg.inv(I - self.W)}
-        for c, p in enumerate(self.input_noise.p):
-            grad['U'] += p * (self.input_noise.covs[c] @ self.U.T + np.outer(self.input_noise.means[c], (self.b + self.U @ self.input_noise.means[c]))) @ prefactors[
-                '(I-W).-TV.TV(I-W)^-1'] \
-                         + p * np.outer(self.input_noise.means[c], self.intercept - self.targets[c]) @ prefactors['V(I-W)^-1']
-            grad['W'] += p * prefactors['(I-W)^-1'] @ (
-                    self.U @ self.input_noise.covs[c] @ self.U.T + self.private_noise.cov + np.outer(self.b + self.U @ self.input_noise.means[c], self.b + self.U @ self.input_noise.means[c])) @ prefactors[
-                             '(I-W).-TV.TV(I-W)^-1'] + p * (
-                                 prefactors['(I-W)^-1'] @ np.outer(self.b + self.U @ self.input_noise.means[c], self.intercept - self.targets[c]) @ prefactors[
-                             'V(I-W)^-1'])
-            grad['b'] += p * (self.b + self.U @ self.input_noise.means[c]).T @ prefactors['(I-W).-TV.TV(I-W)^-1'] + p * (self.intercept -self.targets[c]) @ prefactors[
-                'V(I-W)^-1']
-        for key in grad.keys():
-            grad[key] = grad[key].T
-        """
-        return grad
+            partial_grad_W += p * (self.V @ Vars_given_k[k] + np.outer(error_k, Exps_given_k[k]))
+            partial_grad_b += p * error_k
+        return {'U': recast_op @ partial_grad_U, 'W': recast_op @ partial_grad_W, 'b': recast_op @ partial_grad_b}
 
     def compute_batch_gradient(self):
         I = np.eye(self.network_size)

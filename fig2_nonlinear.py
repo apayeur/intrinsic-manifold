@@ -16,7 +16,17 @@ exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
 do_record_data = True
 activation_function = 'tanh'
 """
-
+""" RELU params
+size = (6, 100, 2)              # (input size, recurrent size, output size)
+intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
+lr_init = 5e-2 #3e-2                  # learning rate for initial training
+lr_decod = lr_init / 2
+lr = 2e-3 #0.1e-2                       # learning rate during adaptation
+nb_iter = int(2e2)              # nb of gradient iteration during initial training
+nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
+seeds = np.arange(5, dtype=int)
+exponents_W = [0.5, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
+"""
 
 def main():
     output_fig_format = 'png'
@@ -26,12 +36,12 @@ def main():
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     lr_init = 5e-2 #3e-2                  # learning rate for initial training
     lr_decod = lr_init / 2
-    lr = 2e-3 #0.1e-2                       # learning rate during adaptation
-    nb_iter = int(2e2)              # nb of gradient iteration during initial training
-    nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
+    lr = 1e-2 #0.1e-2                       # learning rate during adaptation
+    nb_iter = int(3e2)              # nb of gradient iteration during initial training
+    nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seeds = np.arange(5, dtype=int)
     exponents_W = [0.5, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
-    activation_function = 'relu'
+    activation_function = 'tanh'
 
     relearn_after_decoder_fitting = True
     do_record_data = True
@@ -41,7 +51,7 @@ def main():
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = (f"fig2-TEST-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+        tag = (f"fig2-{activation_function}-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
                f"-fitinter{fit_intercept}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
@@ -120,7 +130,7 @@ def main():
                                     'OM': np.empty(shape=len(seeds))}
 
         for seed_id, seed in enumerate(seeds):
-            print(f'\n|==================================== Seed {seed} =====================================|')
+            print(f'\n|==================================== Seed {seed} ======================================|')
             print('\n|-------------------------------- Initial training --------------------------------|')
             net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
                                                  global_mean_input_is_zero=global_mean_input_is_zero,
@@ -167,8 +177,8 @@ def main():
             print('\n|-------------------------------- Select perturbations --------------------------------|')
             selected_wm, selected_om, wm_t_l, om_t_l = \
                 net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1] // 2, nb_samples=int(1e3))
-            if seed_id == 0:
-                wm_total_losses, om_total_losses = wm_t_l, om_t_l
+            np.save(f"{save_dir}/candidate_wm_perturbations_seed{seed}", wm_t_l)
+            np.save(f"{save_dir}/candidate_om_perturbations_seed{seed}", om_t_l)
 
             print('\n|-------------------------------- WM perturbation --------------------------------|')
             net_wm = copy.deepcopy(net2)
@@ -284,10 +294,6 @@ def main():
 
             # Save amount of covariability projected along the row space of D
             np.save(f"{save_dir}/A", A)
-
-            # Save candidate perturbations losses
-            np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
-            np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)
 
             # Save participation ratios
             np.save(f"{save_dir}/participation_ratio", p_ratio)

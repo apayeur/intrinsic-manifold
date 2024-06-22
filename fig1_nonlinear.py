@@ -3,7 +3,7 @@ import numpy as np
 import copy
 import os
 
-tag = f"fig1-test-nonlinear"
+tag = f"fig1-test-tanh"
 save_dir = f"data/egd/{tag}"
 save_dir_results = f"results/egd/{tag}"
 if not os.path.exists(save_dir):
@@ -16,15 +16,15 @@ output_fig_format = 'png'
 
 # Parameters
 size = (6, 100, 2)              # (input size, recurrent size, output size)
-intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
-lr_init = 1e-2 #3e-2                  # learning rate for initial training
+intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
+lr_init = 2e-2 #3e-2                  # learning rate for initial training
 lr_decod = lr_init / 2
-lr = 1e-3 #0.1e-2                       # learning rate during adaptation
-nb_iter = int(1e2)              # nb of gradient iteration during initial training
+lr = 10e-3 #0.1e-2                       # learning rate during adaptation
+nb_iter = int(500)              # nb of gradient iteration during initial training
 nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
-seed = 0
-exponent_W = 0.55        # W_0 ~ N(0, 1/N^exponent_W)
-activation_function = 'linear'
+seed = 1
+exponent_W = 0.5        # W_0 ~ N(0, 1/N^exponent_W)
+activation_function = 'tanh'
 
 relearn_after_decoder_fitting = True
 do_record_data = False
