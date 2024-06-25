@@ -34,13 +34,13 @@ def main():
     # Parameters
     size = (6, 100, 2)              # (input size, recurrent size, output size)
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
-    lr_init = 5e-2 #3e-2                  # learning rate for initial training
+    lr_init = 1e-1 #3e-2                  # learning rate for initial training
     lr_decod = lr_init / 2
-    lr = 1e-2 #0.1e-2                       # learning rate during adaptation
-    nb_iter = int(3e2)              # nb of gradient iteration during initial training
+    lr = 5e-2 #0.1e-2                       # learning rate during adaptation
+    nb_iter = int(1e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seeds = np.arange(5, dtype=int)
-    exponents_W = [0.5, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
+    exponents_W = [0.5]        # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'tanh'
 
     relearn_after_decoder_fitting = True
@@ -51,7 +51,7 @@ def main():
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = (f"fig2-{activation_function}-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+        tag = (f"fig2-largeW-{activation_function}-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
                f"-fitinter{fit_intercept}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"

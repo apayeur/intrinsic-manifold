@@ -8,12 +8,12 @@ plt.style.use('rnn4bci_plot_params.dms')
 Plot of $\Delta W$ across learning for rich and lazy regime (Fig. 2F).
 """
 
-save_fig_dir = f"results/egd/relu"
+save_fig_dir = f"results/egd/tanh"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
-delta_W_lazy = np.load("data/egd/fig2-test_W0.55/total_change_W_Fnorm.npy", allow_pickle=True).item()
-delta_W_rich = np.load("data/egd/fig2-test_W1.0/total_change_W_Fnorm.npy", allow_pickle=True).item()
+delta_W_lazy = np.load("data/egd/fig2-largeW-tanh-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW0.47/total_change_W_Fnorm.npy", allow_pickle=True).item()
+delta_W_rich = np.load("data/egd/fig2-largeW-tanh-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW1.0/total_change_W_Fnorm.npy", allow_pickle=True).item()
 
 data = []
 data.append(delta_W_lazy['WM'])
@@ -31,6 +31,7 @@ for patch, color in zip(bp['boxes'], colors):
     patch.set_facecolor(color)
 
 plt.xticks([0.5, 3.5])
+plt.ylim([0,5])
 plt.gca().set_xticklabels(['Lazy', 'Rich'])
 plt.xlabel('Regime')
 #plt.ylabel(r'$\|\nabla_W L\|_F$')

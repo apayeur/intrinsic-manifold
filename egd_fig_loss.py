@@ -5,13 +5,13 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55, 1.] #, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.5, 1.] #, 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-intrinsic-manifold-dim5-exponentW{exponent_W}"
+    tag = f"fig2-largeW-tanh-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -123,7 +123,7 @@ for exponent_W in exponents_W:
         plt.ylim([0, 0.55])
         plt.yticks([0, 0.5])
         plt.ylabel('Loss')
-    if exponent_W == 0.55:
+    if exponent_W == 0.55 or exponent_W == 0.5:
         plt.gca().text(0.5, 0.9, 'Lazy', ha='center', va='center', transform=plt.gca().transAxes)
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
@@ -134,7 +134,7 @@ for exponent_W in exponents_W:
     plt.xlim([0, len(m)])
     plt.xticks([0, len(m)])
     plt.xlabel(x_label)
-    plt.legend()
+    plt.legend(loc='center right')
     plt.tight_layout()
     outfile_name = f'{save_fig_dir}/LossAdapt.{output_fig_format}' if not plot_relative_loss else f'{save_fig_dir}/LossAdaptRelative.{output_fig_format}'
     plt.savefig(outfile_name)

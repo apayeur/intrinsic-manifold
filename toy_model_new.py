@@ -48,7 +48,7 @@ class NonlinearDeterministicNetwork:
         self.intercept = np.zeros(self.output_size)  # intercept of the decoder
         self.inv_Sv = np.eye(self.network_size)  # matrix for z-scoring activity
         self.inv_Sz = None # matrix for z-scoring PCs
-        self.ma_0 = np.zeros(self.network_size)
+        self.ma_0 = np.zeros(self.network_size)  # mean activity after initial training (used for z-scoring)
 
         # Targets
         self.targets = [np.array([np.cos(2 * np.pi * i / self.nb_inputs),
@@ -72,7 +72,7 @@ class NonlinearDeterministicNetwork:
 
     def init_params(self, exponent_W, exponent_V):
         U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
-        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
+        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W   # DEBUG!!!
         V = self.rng.standard_normal(size=(2, self.network_size)) # / self.network_size ** exponent_V
         b = np.zeros(self.network_size)  # self.rng.uniform(low=0, high=1, size=(self.network_size, ))
         initial_decoder_fac = 0.2
@@ -146,7 +146,7 @@ class NonlinearDeterministicNetwork:
         rates = self.conditioned_activities()
         L = 0.
         for k in range(self.nb_inputs):
-            error = self.V @ rates[k] - self.targets[k]
+            error = self.V @ (rates[k] - self.ma_0) + self.intercept - self.targets[k]
             L += np.dot(error, error)
         return 0.5 * L / self.nb_inputs
 
@@ -154,7 +154,7 @@ class NonlinearDeterministicNetwork:
         losses = np.zeros(self.nb_inputs)
         rates = self.conditioned_activities()
         for k in range(self.nb_inputs):
-            error = self.V @ rates[k] - self.targets[k]
+            error = self.V @ (rates[k] - self.ma_0) + self.intercept - self.targets[k]
             losses[k] = 0.5 * np.dot(error, error)
         return losses / self.nb_inputs
 
@@ -171,13 +171,13 @@ class NonlinearDeterministicNetwork:
             grad = np.zeros_like(self.W)
             for k in range(self.nb_inputs):
                 J = self.phi_jac(potentials[k])
-                error = self.V @ self.phi(potentials[k]) - self.targets[k]
+                error = self.V @ (self.phi(potentials[k]) - self.ma_0) + self.intercept - self.targets[k]
                 grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
             grad /= self.nb_inputs
         else:
             partial_grad = np.zeros_like(self.V)
             for k in range(self.nb_inputs):
-                partial_grad += np.outer(self.V @ potentials[k] - self.targets[k], potentials[k])
+                partial_grad += np.outer(self.V @ (potentials[k] - self.ma_0) + self.intercept - self.targets[k], potentials[k])
             grad = (self.V @ self.inv_I_minus_W()).T @ partial_grad / self.nb_inputs
         ng = np.linalg.norm(grad)
         threshold = 1.
@@ -197,8 +197,6 @@ class NonlinearDeterministicNetwork:
             }
         else:
             data = None
-        if self.D is not None:
-            d = self.D.shape[1]
 
         var_init = self.activity_covariance()
 
@@ -232,10 +230,10 @@ class NonlinearDeterministicNetwork:
 
             if nb_iter == 0:
                 if i % 500 == 0:
-                    print(f"Iteration {i:>4} : loss = {loss}  |  relative loss = {loss/initial_loss}")
+                    print(f"Iteration {i:>4} : loss = {loss:.10e}  |  relative loss = {loss/initial_loss:.10e}")
             elif nb_iter > 5:
                 if i % (nb_iter // 5) == 0 or i == nb_iter - 1:
-                    print(f"Iteration {i:>4} : loss = {loss}  |  relative loss = {loss/initial_loss}")
+                    print(f"Iteration {i:>4} : loss = {loss:.10e}  |  relative loss = {loss/initial_loss:.10e}")
 
             # Compute gradient
             g = self.compute_gradient()
@@ -317,9 +315,9 @@ class NonlinearDeterministicNetwork:
             self.D = lr.coef_
             print("Fit R2:", lr.score((ca - self.ma_0) @ C_loc.T, ca @ self.V.T))
             print("D =", self.D)
-            target_shift = self.D @ C_loc @ self.ma_0 - self.intercept
-            for i in range(self.nb_inputs):
-                self.targets[i] += target_shift
+            #target_shift = self.D @ C_loc @ self.ma_0 - self.intercept
+            #for i in range(self.nb_inputs):
+            #    self.targets[i] += target_shift
         self.V = self.D @ C_loc
         return intrinsic_manifold_dim, dim
 
@@ -410,9 +408,6 @@ class NonlinearDeterministicNetwork:
         for i in range(self.network_size):
             lr.fit(np.array(self.targets), ca[:, i])
             r = lr.predict(np.array(self.targets))
-            #plt.plot(np.arange(self.nb_inputs), r)
-            #plt.plot(np.arange(self.nb_inputs), ca[:, i], label='true')
-            #plt.show()
             mds.append(np.max(r) - np.min(r))
         return mds
 
@@ -437,13 +432,11 @@ class NonlinearDeterministicNetwork:
     def plot_output(self, outfile_name=None):
         plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
         rates = self.conditioned_activities()
-        original_targets = [np.array([np.cos(2 * np.pi * i / self.nb_inputs),
-                                      np.sin(2 * np.pi * i / self.nb_inputs)]) for i in range(self.nb_inputs)]
         for k in range(self.nb_inputs):
-            u = self.V @ rates[k] - self.targets[k] + original_targets[k]
+            u = self.V @ (rates[k] - self.ma_0) + self.intercept
             plt.scatter(u[0], u[1], s=8,
                         facecolor=target_colors[k], edgecolors='white', lw=0.2, zorder=10)
-            plt.scatter(original_targets[k][0],  original_targets[k][1], s=13,
+            plt.scatter(self.targets[k][0], self.targets[k][1], s=13,
                         facecolor=target_colors[k], edgecolors='black', lw=0.4)
         plt.xticks([-2, 2])
         plt.yticks([-2, 2])
