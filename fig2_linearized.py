@@ -1,32 +1,8 @@
-from toy_model_new import NonlinearDeterministicNetwork
+from linearized_model import LinearizedModel
 import numpy as np
 import copy
 import os
 from scipy.linalg import subspace_angles
-
-"""
-TANH params
-lr_init = 1e-2                  # learning rate for initial training
-lr = 0.5e-2                       # learning rate during adaptation
-nb_iter = int(5e2)              # nb of gradient iteration during initial training
-nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
-seeds = np.arange(1, dtype=int)
-relearn_after_decoder_fitting = False
-exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
-do_record_data = True
-activation_function = 'tanh'
-"""
-""" RELU params
-size = (6, 100, 2)              # (input size, recurrent size, output size)
-intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
-lr_init = 5e-2 #3e-2                  # learning rate for initial training
-lr_decod = lr_init / 2
-lr = 2e-3 #0.1e-2                       # learning rate during adaptation
-nb_iter = int(2e2)              # nb of gradient iteration during initial training
-nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
-seeds = np.arange(5, dtype=int)
-exponents_W = [0.5, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
-"""
 
 def main():
     output_fig_format = 'png'
@@ -34,12 +10,12 @@ def main():
     # Parameters
     size = (6, 100, 2)              # (input size, recurrent size, output size)
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
-    lr_init = 1e-2 #3e-2                  # learning rate for initial training
+    lr_init = 5e-2 #3e-2                  # learning rate for initial training
     lr_decod = lr_init / 2
-    lr = 1e-3 #0.1e-2                       # learning rate during adaptation
-    nb_iter = int(1e2)              # nb of gradient iteration during initial training
-    nb_iter_adapt = int(2.5e2)        # nb of gradient iteration during adaptation
-    seeds = np.arange(1, dtype=int)
+    lr = 1e-2 #0.1e-2                       # learning rate during adaptation
+    nb_iter = int(5e2)              # nb of gradient iteration during initial training
+    nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
+    seeds = np.arange(5, dtype=int)
     exponents_W = [0.55, 1]        # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'linear'
 
@@ -51,7 +27,7 @@ def main():
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = (f"fig2-{activation_function}-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+        tag = (f"fig2-linearized-{activation_function}-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
                f"-fitinter{fit_intercept}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
@@ -132,12 +108,11 @@ def main():
         for seed_id, seed in enumerate(seeds):
             print(f'\n|==================================== Seed {seed} ======================================|')
             print('\n|-------------------------------- Initial training --------------------------------|')
-            net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
-                                                 global_mean_input_is_zero=global_mean_input_is_zero,
-                                                 do_z_score=do_z_score, rng_seed=seed_id,
-                                                 activation_function=activation_function)
+            net0 = LinearizedModel(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
+                                   global_mean_input_is_zero=global_mean_input_is_zero,
+                                   do_z_score=do_z_score, rng_seed=seed_id,
+                                   activation_function=activation_function)
             data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
-            ca = np.asarray(net0.conditioned_activities()).mean(axis=0)
 
             # compute participation ratio
             if do_record_data:
@@ -162,7 +137,6 @@ def main():
 
             net1.plot_output(outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting_seed{seed}.{output_fig_format}")
             V_0 = copy.deepcopy(net1.V)
-            print("Decoder intercept :", net1.intercept)
 
             '------------------------------------------- Retraining decoder -------------------------------------------'
             net2 = copy.deepcopy(net1)

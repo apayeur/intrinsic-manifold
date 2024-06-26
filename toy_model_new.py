@@ -72,7 +72,7 @@ class NonlinearDeterministicNetwork:
 
     def init_params(self, exponent_W, exponent_V):
         U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
-        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W   # DEBUG!!!
+        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
         V = self.rng.standard_normal(size=(2, self.network_size)) # / self.network_size ** exponent_V
         b = np.zeros(self.network_size)  # self.rng.uniform(low=0, high=1, size=(self.network_size, ))
         initial_decoder_fac = 0.2
@@ -165,6 +165,9 @@ class NonlinearDeterministicNetwork:
         return 0.5 * np.trace(self.V @ (ac + np.outer(ma, ma)) @ self.V.T)
 
     # =========  Training ==========
+    def max_eigval(self, potentials):
+        return np.max([np.max(np.abs(np.linalg.eigvals(self.W @ self.phi_jac(potentials[k])))) for k in range(self.nb_inputs)])
+
     def compute_gradient(self):
         potentials = self.conditioned_potentials()
         if self.activation_function != 'linear':
@@ -222,9 +225,8 @@ class NonlinearDeterministicNetwork:
 
                 data['pr'].append(self.participation_ratio())
                 potentials = self.conditioned_potentials()
-                max_eigvals = [np.max(np.abs(np.linalg.eigvals(self.W@self.phi_jac(potentials[k])))) for k in range(self.nb_inputs)]
                 #data['max_eigvals'].append(np.max(max_eigvals))
-                if np.max(max_eigvals) >= 1:
+                if self.max_eigval(potentials) >= 1:
                     print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", "EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
                     data['losses']['task'][-1] = -1
 
@@ -315,6 +317,7 @@ class NonlinearDeterministicNetwork:
             self.D = lr.coef_
             print("Fit R2:", lr.score((ca - self.ma_0) @ C_loc.T, ca @ self.V.T))
             print("D =", self.D)
+            print("Intercept:", self.intercept)
             #target_shift = self.D @ C_loc @ self.ma_0 - self.intercept
             #for i in range(self.nb_inputs):
             #    self.targets[i] += target_shift
