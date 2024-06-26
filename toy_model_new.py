@@ -224,9 +224,11 @@ class NonlinearDeterministicNetwork:
                 data['losses']['corr'].append(self.correlation_component_loss())
 
                 data['pr'].append(self.participation_ratio())
+
                 potentials = self.conditioned_potentials()
-                #data['max_eigvals'].append(np.max(max_eigvals))
-                if self.max_eigval(potentials) >= 1:
+                max_ev = self.max_eigval(potentials)
+                data['max_eigvals'].append(max_ev)
+                if max_ev >= 1:
                     print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", "EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
                     data['losses']['task'][-1] = -1
 
