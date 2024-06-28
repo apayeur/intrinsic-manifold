@@ -9,25 +9,25 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (8, 100, 2)              # (input size, recurrent size, output size)
+    size = (6, 100, 2)              # (input size, recurrent size, output size)
     input_noise_intensity = 0e-4    # set to zero for 1-of-K encoding
     private_noise_intensity = 1e-2
-    intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
+    intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     lr_init = (0, 1e-2, 0)          # learning rate for initial training
     lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
-    lrs = [0.0005]  # learning rate during adaptation
+    lrs = [0.001]  # learning rate during adaptation
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
-    nb_iter_adapt = int(2e3)        # nb of gradient iteration during adaptation
+    nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seeds = np.arange(5, dtype=int)
     relearn_after_decoder_fitting = False
-    exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
+    exponents_W = [0.55]        # W_0 ~ N(0, 1/N^exponent_W)
     do_scale_V_OM = False
 
     for exponent_W in exponents_W:
         for lr in lrs:
             lr_adapt = (0, lr, 0)  # was lr/15
             # Manage save and load folders
-            tag = f"fig2-8targets_W{exponent_W}"  # identification of this experiment, for bookkeeping
+            tag = f"old-fig2-M{intrinsic_manifold_dim}-expW{exponent_W}"  # identification of this experiment, for bookkeeping
             #tag = f"zeroInitW-lr{lr_adapt[1]}-M{intrinsic_manifold_dim}-iterAdapt{nb_iter_adapt}-real-dims"
             save_dir = f"data/egd/{tag}"
             save_dir_results = f"results/egd/{tag}"
@@ -150,7 +150,7 @@ def main():
 
                 print('\n|-------------------------------- Select perturbations --------------------------------|')
                 selected_wm, selected_om, wm_t_l, om_t_l = \
-                    net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1])
+                    net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1], nb_samples=int(1e3))
                 if seed_id == 0:
                     wm_total_losses, om_total_losses = wm_t_l, om_t_l
 

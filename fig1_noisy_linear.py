@@ -1,9 +1,9 @@
-from toy_model_new import NonlinearDeterministicNetwork
+from noisy_linear_model import NoisyLinearNetwork
 import numpy as np
 import copy
 import os
 
-tag = f"fig1-test-linear-nonlinear"
+tag = f"fig1-test-noisy-linear"
 save_dir = f"data/egd/{tag}"
 save_dir_results = f"results/egd/{tag}"
 if not os.path.exists(save_dir):
@@ -17,26 +17,24 @@ output_fig_format = 'png'
 # Parameters
 size = (6, 100, 2)              # (input size, recurrent size, output size)
 intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
+noise = 1e-2
 lr_init = 5e-2 #3e-2                  # learning rate for initial training
 lr_decod = lr_init / 2
-lr = 10e-3 #0.1e-2                       # learning rate during adaptation
-nb_iter = int(500)              # nb of gradient iteration during initial training
+lr = 1e-3 #0.1e-2                       # learning rate during adaptation
+nb_iter = int(5e2)              # nb of gradient iteration during initial training
 nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
 seed = 0
 exponent_W = 0.55        # W_0 ~ N(0, 1/N^exponent_W)
-activation_function = 'linear'
 
-relearn_after_decoder_fitting = True
+relearn_after_decoder_fitting = False
 do_record_data = False
 do_z_score = False
 global_mean_input_is_zero = False
 fit_intercept = False
 
-net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
+net0 = NoisyLinearNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
                                      global_mean_input_is_zero=global_mean_input_is_zero,
-                                     do_z_score=do_z_score, rng_seed=seed,
-                                     activation_function=activation_function)
-
+                                     do_z_score=do_z_score, rng_seed=seed, noise=noise)
 data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
 net0.plot_output(outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
 print("Max abs eigvals W = ", np.max(np.abs(np.linalg.eigvals(net0.W))))

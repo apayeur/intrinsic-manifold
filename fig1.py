@@ -11,20 +11,20 @@ def main():
     # Parameters
     size = (6, 100, 2)              # (input size, recurrent size, output size)
     input_noise_intensity = 0e-4    # set to zero for 1-of-K encoding
-    private_noise_intensity = 0 # 1e-2
+    private_noise_intensity = 1e-2
     intrinsic_manifold_dim = 6      # dimension of manifold for control (M)
     lr_init = (0, 5e-2, 0) # (0, 1e-2, 0)          # learning rate for initial training
     lr_decoder = (0, 5e-3, 0)       # not used wen `relearn_after_decoder_fitting = False` below
     lr = 0.001                      # learning rate during adaptation
     lr_adapt = (0, lr, 0)
-    nb_iter = int(1) #int(5e2)              # nb of gradient iteration during initial training
+    nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seed = 0
     relearn_after_decoder_fitting = False
     exponent_W = 0.55               # W_0 ~ N(0, 1/N^exponent_W) -- in the lazy regime for Fig. 1
 
     # Manage save and load folders
-    tag = f"fig1-TEST"
+    tag = f"fig1-original"
     save_dir = f"data/egd/{tag}"
     save_dir_results = f"results/egd/{tag}"
     if not os.path.exists(save_dir):

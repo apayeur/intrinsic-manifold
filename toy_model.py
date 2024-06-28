@@ -995,6 +995,8 @@ class ToyNetwork:
             om_losses[perm_counter] = self.loss_for_each_target()
             om_total_losses.append(self.loss_function())
             om_permutations[perm_counter] = indices_i
+        print(f"\nMedian total loss for OM perturbation : {np.median(om_total_losses)}")
+        print(f"Median target-wise loss for OM perturbation : {np.median(om_losses, axis=0)}")
 
         # Return to original mapping
         self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
@@ -1002,7 +1004,7 @@ class ToyNetwork:
         # Compute median target-specific losses across all WM and OM permutations
         #median_per_target_loss = np.median(wm_losses, axis=0, keepdims=True)
         median_per_target_loss = np.median(np.vstack((wm_losses, om_losses)), axis=0, keepdims=True)
-        print(f'Combined median per-target loss = {median_per_target_loss}')
+        print(f'\nCombined median per-target loss = {median_per_target_loss}')
 
         # Find WM and OM permutations closest to median WM perturbations
         normed_diff = np.linalg.norm(wm_losses - median_per_target_loss, axis=1)

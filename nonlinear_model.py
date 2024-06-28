@@ -1,12 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import target_colors, gram_schmidt, principal_angles, units_convert
-from random_vector import MultivariateNormal, GaussianMixture
 plt.style.use('rnn4bci_plot_params.dms')
-import sklearn.linear_model as lm
-from numba import njit
-from utils import target_colors, gram_schmidt, principal_angles, units_convert
-from numba.typed import List as nbList
+from utils import target_colors, units_convert
 import activation_functions
 import copy
 import itertools
@@ -17,7 +12,7 @@ from sklearn.linear_model import LinearRegression
 
 
 class NonlinearDeterministicNetwork:
-    def __init__(self, network_size=100, nb_inputs=6, exponent_W=0.55, exponent_V=1,
+    def __init__(self, network_size=100, nb_inputs=6, exponent_W=0.55,
                  global_mean_input_is_zero=False, do_z_score=False, rng_seed=1, activation_function='tanh'):
         self.size = (nb_inputs, network_size, 2)
         self.input_size, self.network_size, self.output_size = self.size
@@ -42,7 +37,6 @@ class NonlinearDeterministicNetwork:
             raise ValueError("`activation_function` must be 'tanh', 'relu' or 'linear'")
 
         # BCI decoder attributes
-        self.decoder = None  # sklearn LinearModel object
         self.C = None  # projection matrix, shape = (intrinsic_manifold_dim, self.network_size)
         self.D = None  # decoding matrix, shape = (self.output_size, intrinsic_manifold_dim)
         self.intercept = np.zeros(self.output_size)  # intercept of the decoder
@@ -62,7 +56,7 @@ class NonlinearDeterministicNetwork:
         for i in range(self.nb_inputs):
             self.inputs[i][i] = 1. + self.inputs[i][i]
 
-        self.U, self.W, self.V, self.b = self.init_params(exponent_W=exponent_W, exponent_V=exponent_V)
+        self.U, self.W, self.V, self.b = self.init_params(exponent_W=exponent_W)
 
         self.prev_potentials = [self.inv_I_minus_W() @ (self.U @ self.inputs[k] + self.b) for k in range(self.nb_inputs)] # as initial condition for solver
 
@@ -70,10 +64,10 @@ class NonlinearDeterministicNetwork:
         self.selected_permutation_WM = None
         self.selected_permutation_OM = None
 
-    def init_params(self, exponent_W, exponent_V):
+    def init_params(self, exponent_W):
         U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
         W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
-        V = self.rng.standard_normal(size=(2, self.network_size)) # / self.network_size ** exponent_V
+        V = self.rng.standard_normal(size=(2, self.network_size))
         b = np.zeros(self.network_size)  # self.rng.uniform(low=0, high=1, size=(self.network_size, ))
         initial_decoder_fac = 0.2
         V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / self.network_size) ** 0.5
@@ -138,8 +132,9 @@ class NonlinearDeterministicNetwork:
             ac += np.outer(cma[k] - self.mean_activity(), cma[k] - self.mean_activity())
         return ac / self.nb_inputs
 
-    def activity_correlation(self):
-        return self.activity_covariance() + np.outer(self.mean_activity(), self.mean_activity())
+    def activity_correlation_matrix(self):
+        S_v_inv = np.diag(np.sqrt(np.diag(self.activity_covariance())) ** -1)
+        return S_v_inv @ self.activity_covariance() @ S_v_inv
 
     # ==============  Loss ================
     def task_loss(self):
@@ -212,28 +207,25 @@ class NonlinearDeterministicNetwork:
         i = 0
         loss = 1e9
         initial_loss = self.task_loss()
-        grad_norm = 0.
         while i < int(nb_iter) or loss > stopping_crit:
             var_prev = self.activity_covariance()
             if do_record_data:
-                data['tot_var'] = np.trace(var_prev)
-            # Compute loss and loss components
+                data['tot_var'].append(np.trace(var_prev))
             loss = self.task_loss()
+
+            potentials = self.conditioned_potentials()
+            max_ev = self.max_eigval(potentials)
+            if max_ev >= 1:
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", "EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
             if do_record_data:
-                data['losses']['task'].append(loss)
+                data['losses']['task'].append(loss if max_ev < 1 else -1)
                 data['losses']['corr'].append(self.correlation_component_loss())
-
                 data['pr'].append(self.participation_ratio())
-
-                potentials = self.conditioned_potentials()
-                max_ev = self.max_eigval(potentials)
                 data['max_eigvals'].append(max_ev)
-                if max_ev >= 1:
-                    print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", "EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                    data['losses']['task'][-1] = -1
 
             if nb_iter == 0:
-                if i % 500 == 0:
+                if i % 100 == 0:
                     print(f"Iteration {i:>4} : loss = {loss:.10e}  |  relative loss = {loss/initial_loss:.10e}")
             elif nb_iter > 5:
                 if i % (nb_iter // 5) == 0 or i == nb_iter - 1:
@@ -241,11 +233,9 @@ class NonlinearDeterministicNetwork:
 
             # Compute gradient
             g = self.compute_gradient()
-            grad_norm = np.linalg.norm(g)
 
             if self.C is not None:
                 if do_record_data:
-                    # Compute norm of the gradient
                     data['norm_gradW'].append(np.linalg.norm(g))
 
                     # Compute angles
@@ -291,12 +281,17 @@ class NonlinearDeterministicNetwork:
 
     # ============ Methods related to decoder ==============
     def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False):
-        tot_var = self.activity_correlation() if self.do_z_score else self.activity_covariance()
-        _, s, vt = np.linalg.svd(tot_var)
-        evs = np.linalg.eigvals(tot_var)
+        if self.do_z_score:
+            self.inv_Sv = np.diag(np.sqrt(np.diag(self.activity_covariance())) ** -1)
+            self.ma_0 = self.mean_activity()
+
+        tot_var = self.activity_correlation_matrix() if self.do_z_score else self.activity_covariance()
+        w, v = np.linalg.eig(tot_var)
+        ranked_eig_indices = np.argsort(w)[::-1]  # need to order eigensystem
+        vt = v[:, ranked_eig_indices].T
 
         dim = self.dimensionality(threshold=threshold)
-        print('Number of PCs for {} of total variance = {}'.format(threshold, dim))
+        print(f"Number of PCs for {threshold} of total variance = {dim}")
         if intrinsic_manifold_dim is None:
             intrinsic_manifold_dim = dim
 
@@ -304,7 +299,6 @@ class NonlinearDeterministicNetwork:
         self.inv_Sz = np.diag(np.sqrt(np.diag(self.C @ tot_var @ self.C.T)) ** -1) if self.do_z_score else np.eye(
             intrinsic_manifold_dim)
         C_loc = self.inv_Sz @ self.C @ self.inv_Sv
-        self.ma_0 = self.mean_activity() if self.do_z_score else np.zeros(self.network_size)
 
         if not fit_intercept and not self.do_z_score:
             # Exact solution
@@ -418,20 +412,23 @@ class NonlinearDeterministicNetwork:
 
     # ============ Methods related to dimensionality ==============
     @staticmethod
-    def dimensionality_(covariance_matrix, threshold=0.99):
-        _, singular_values, _ = np.linalg.svd(
-            covariance_matrix)  # using svg instead of eigvals because we want them properly ordered
-        cum_var = np.cumsum(singular_values)
+    def dimensionality_(covariance_matrix, threshold):
+        w = np.linalg.eigvals(covariance_matrix)
+        ranked_eigvals = np.sort(w)[::-1]
+        cum_var = np.cumsum(ranked_eigvals)
         return np.nonzero(cum_var > threshold * cum_var[-1])[0][0] + 1  # +1 because array elements start at zero
 
     def dimensionality(self, threshold=0.99):
-        return self.dimensionality_(self.activity_covariance(), threshold=threshold)
+        return self.dimensionality_(self.activity_correlation_matrix(), threshold) if self.do_z_score \
+            else self.dimensionality_(self.activity_covariance(), threshold)
+
     @staticmethod
     def participation_ratio_(covariance_matrix):
         return (np.trace(covariance_matrix)) ** 2 / np.trace(covariance_matrix @ covariance_matrix)
 
     def participation_ratio(self):
-        return self.participation_ratio_(self.activity_covariance())
+        return self.participation_ratio_(self.activity_correlation_matrix()) if self.do_z_score \
+            else self.participation_ratio_(self.activity_covariance())
 
     #  ========  Plotting functions  =========
     def plot_output(self, outfile_name=None):

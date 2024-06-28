@@ -11,7 +11,7 @@ output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-linear-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}"
+    tag = f"fig2-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -127,12 +127,12 @@ for exponent_W in exponents_W:
         plt.gca().text(0.5, 0.9, 'Lazy', ha='center', va='center', transform=plt.gca().transAxes)
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
-    # if exponent_W == 0.55:
-    #     plt.xlim([0, 500])
-    #     plt.xticks(plt.gca().get_xlim())
-    # else:
-    plt.xlim([0, len(m)])
-    plt.xticks([0, len(m)])
+    if exponent_W == 0.55:
+         plt.xlim([0, 500])
+         plt.xticks(plt.gca().get_xlim())
+    else:
+        plt.xlim([0, len(m)])
+        plt.xticks([0, len(m)])
     plt.xlabel(x_label)
     plt.legend(loc='center right')
     plt.tight_layout()
