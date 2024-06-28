@@ -320,10 +320,14 @@ class NonlinearDeterministicNetwork:
         self.V = self.D @ C_loc
         return intrinsic_manifold_dim, dim
 
-    def select_perturb(self, intrinsic_manifold_dim, nb_om_permuted_units=30, nb_samples=int(1e3)):
+    def select_perturb(self, intrinsic_manifold_dim, nb_om_permuted_units=30, nb_samples=int(1e3),
+                       om_select_method='original'):
+        if om_select_method != 'original' and om_select_method != 'modified':
+            raise ValueError(f"OM selection method was {om_select_method} but must be either `original` or `modified`.")
+
         """Select the WM and OM perturbations"""
         nb_samples_wm = factorial(intrinsic_manifold_dim) if intrinsic_manifold_dim <= 8 else nb_samples
-        nb_samples_om = max(nb_samples, nb_samples_wm)
+        nb_samples_om = max(nb_samples, nb_samples_wm) if om_select_method == 'original' else factorial(intrinsic_manifold_dim)
 
         wm_permutations = np.empty(shape=(nb_samples_wm, intrinsic_manifold_dim))
         om_permutations = np.empty(shape=(nb_samples_om, self.network_size))
@@ -355,17 +359,38 @@ class NonlinearDeterministicNetwork:
         self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
         mds = self.get_modulation_depth()
         sorted_indices = np.argsort(mds)
-        indices_to_permute = sorted_indices[-nb_om_permuted_units:]
 
-        for perm_counter in range(nb_samples_om):
-            indices = copy.deepcopy(indices_to_permute)
-            self.rng.shuffle(indices)
-            indices_i = np.arange(self.network_size)
-            indices_i[indices_to_permute] = indices
-            self.V = self.D @ self.inv_Sz @ self.C[:, indices_i] @ self.inv_Sv
-            om_losses[perm_counter] = self.loss_for_each_target()
-            om_total_losses.append(self.task_loss())
-            om_permutations[perm_counter] = indices_i
+        if om_select_method == 'original':
+            indices_to_permute = sorted_indices[-nb_om_permuted_units:]
+
+            for perm_counter in range(nb_samples_om):
+                indices = copy.deepcopy(indices_to_permute)
+                self.rng.shuffle(indices)
+                indices_i = np.arange(self.network_size)
+                indices_i[indices_to_permute] = indices
+                self.V = self.D @ self.inv_Sz @ self.C[:, indices_i] @ self.inv_Sv
+                om_losses[perm_counter] = self.loss_for_each_target()
+                om_total_losses.append(self.task_loss())
+                om_permutations[perm_counter] = indices_i
+        else:
+            nb_blocks = intrinsic_manifold_dim
+            nb_units_per_blocks = self.network_size // nb_blocks
+            nb_remaining_units = self.network_size % nb_blocks
+            partial_indices = sorted_indices[:-nb_remaining_units]
+            blocks = [partial_indices[i*nb_units_per_blocks:(i+1)*nb_units_per_blocks] for i in range(nb_blocks)]
+            assert len(blocks) == intrinsic_manifold_dim, "len(block) not equal to intrinsic manifold dimension"
+            s = 0
+            for b in range(nb_blocks):
+                s += len(blocks[b])
+            s += nb_remaining_units
+            assert s == self.network_size, f"s = {s} different for network size {self.network_size}"
+            for perm_counter, perm in enumerate(itertools.permutations(range(intrinsic_manifold_dim))):
+                indices = np.hstack((*[blocks[i] for i in perm], sorted_indices[-nb_remaining_units:]))
+                self.V = self.D @ self.inv_Sz @ self.C[:, indices] @ self.inv_Sv
+                om_losses[perm_counter] = self.loss_for_each_target()
+                om_total_losses.append(self.task_loss())
+                om_permutations[perm_counter] = indices
+
         print(f"\nMedian total loss for OM perturbation : {np.median(om_total_losses)}")
         print(f"Median target-wise loss for OM perturbation : {np.median(om_losses, axis=0)}")
 

@@ -3,7 +3,7 @@ import numpy as np
 import copy
 import os
 
-tag = f"fig1-test-noisy-linear"
+tag = f"fig1-test-new-omselection"
 save_dir = f"data/egd/{tag}"
 save_dir_results = f"results/egd/{tag}"
 if not os.path.exists(save_dir):
@@ -21,7 +21,7 @@ noise = 1e-2
 lr_init = 5e-2 #3e-2                  # learning rate for initial training
 lr_decod = lr_init / 2
 lr = 1e-3 #0.1e-2                       # learning rate during adaptation
-nb_iter = int(5e2)              # nb of gradient iteration during initial training
+nb_iter = int(1e2)              # nb of gradient iteration during initial training
 nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
 seed = 0
 exponent_W = 0.55        # W_0 ~ N(0, 1/N^exponent_W)
@@ -57,7 +57,7 @@ if relearn_after_decoder_fitting:
 
 print('\n|-------------------------------- Select perturbations --------------------------------|')
 selected_wm, selected_om, wm_t_l, om_t_l = \
-    net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1] // 2, nb_samples=int(1e3))
+    net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=size[1] // 2, nb_samples=int(1e3), om_select_method='modified')
 wm_total_losses, om_total_losses = wm_t_l, om_t_l
 
 print('\n|-------------------------------- WM perturbation --------------------------------|')
