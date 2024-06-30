@@ -11,7 +11,7 @@ output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}"
+    tag = f"fig2-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}-subsampledOMP"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"

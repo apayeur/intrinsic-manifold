@@ -41,7 +41,7 @@ class NonlinearDeterministicNetwork:
         self.D = None  # decoding matrix, shape = (self.output_size, intrinsic_manifold_dim)
         self.intercept = np.zeros(self.output_size)  # intercept of the decoder
         self.inv_Sv = np.eye(self.network_size)  # matrix for z-scoring activity
-        self.inv_Sz = None # matrix for z-scoring PCs
+        self.inv_Sz = None  # matrix for z-scoring PCs
         self.ma_0 = np.zeros(self.network_size)  # mean activity after initial training (used for z-scoring)
 
         # Targets
@@ -373,10 +373,27 @@ class NonlinearDeterministicNetwork:
                 om_total_losses.append(self.task_loss())
                 om_permutations[perm_counter] = indices_i
         else:
+            nb_dead_units = np.sum(np.asarray(mds) < 1e-6)
+            print('Number of dead units, from modulation depth:', nb_dead_units)
             nb_blocks = intrinsic_manifold_dim
-            nb_units_per_blocks = self.network_size // nb_blocks
-            nb_remaining_units = self.network_size % nb_blocks
-            partial_indices = sorted_indices[:-nb_remaining_units]
+            nb_remaining_units = (self.network_size - nb_dead_units) % nb_blocks
+
+            # TODO: There is a less meathead way to do the following.
+            if nb_remaining_units == 0 and nb_dead_units == 0:
+                nb_units_per_blocks = self.network_size // (nb_blocks + 1)
+                nb_remaining_units = nb_units_per_blocks + self.network_size % (nb_blocks + 1)
+            if nb_remaining_units > 0 and nb_dead_units == 0:
+                nb_units_per_blocks = self.network_size // nb_blocks
+                nb_remaining_units = self.network_size % nb_blocks
+            if nb_remaining_units == 0 and nb_dead_units > 0:
+                nb_remaining_units = nb_dead_units
+                nb_units_per_blocks = (self.network_size - nb_remaining_units) % nb_blocks
+            if nb_remaining_units > 0 and nb_dead_units > 0:
+                nb_remaining_units += nb_dead_units
+                nb_units_per_blocks = (self.network_size - nb_remaining_units) % nb_blocks
+            if nb_remaining_units == 0:
+                raise ValueError(f"0 remaining units, because {self.network_size}%{nb_blocks} = 0.")
+            partial_indices = sorted_indices[:-nb_remaining_units] if nb_remaining_units > 0 else sorted_indices
             blocks = [partial_indices[i*nb_units_per_blocks:(i+1)*nb_units_per_blocks] for i in range(nb_blocks)]
             assert len(blocks) == intrinsic_manifold_dim, "len(block) not equal to intrinsic manifold dimension"
             s = 0

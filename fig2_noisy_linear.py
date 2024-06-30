@@ -9,7 +9,7 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 100, 2)              # (input size, recurrent size, output size)
+    size = (6, 101, 2)              # (input size, recurrent size, output size)
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     noise = 1e-2
     lr_init = 1e-2  # 3e-2                  # learning rate for initial training
@@ -153,7 +153,7 @@ def main():
             selected_wm, selected_om, wm_t_l, om_t_l = \
                 net2.select_perturb(intrinsic_manifold_dim,
                                     nb_om_permuted_units=nb_om_permuted_units,
-                                    nb_samples=int(1e3))
+                                    nb_samples=int(1e3), om_select_method='modified')
             np.save(f"{save_dir}/candidate_wm_perturbations_seed{seed}", wm_t_l)
             np.save(f"{save_dir}/candidate_om_perturbations_seed{seed}", om_t_l)
 

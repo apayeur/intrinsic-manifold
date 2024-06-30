@@ -35,13 +35,13 @@ def main():
     # Parameters
     size = (6, 100, 2)              # (input size, recurrent size, output size)
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
-    lr_init = 5e-3 #3e-2                  # learning rate for initial training
+    lr_init = 5e-2 #3e-2                  # learning rate for initial training
     lr_decod = lr_init / 2
-    lr = 0.5e-4 #0.1e-2                       # learning rate during adaptation
+    lr = 1e-3 #0.1e-2                       # learning rate during adaptation
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(1e3)        # nb of gradient iteration during adaptation
     seeds = np.arange(1, dtype=int)
-    exponents_W = [0.5]        # W_0 ~ N(0, 1/N^exponent_W)
+    exponents_W = [0.55]        # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'relu'
 
     relearn_after_decoder_fitting = False
@@ -137,7 +137,7 @@ def main():
                                                  global_mean_input_is_zero=global_mean_input_is_zero,
                                                  do_z_score=do_z_score, rng_seed=seed_id,
                                                  activation_function=activation_function)
-            data = net0.train(lr=lr_init, stopping_crit=1e-4, do_record_data=do_record_data)
+            data = net0.train(lr=lr_init, stopping_crit=1e-5, do_record_data=do_record_data)
 
             #if do_record_data:
             #    p_ratio['initial'][seed_id] = net0.participation_ratio()
