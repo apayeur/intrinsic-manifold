@@ -25,6 +25,7 @@ nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
 seed = 0
 exponent_W = 0.55        # W_0 ~ N(0, 1/N^exponent_W)
 activation_function = 'relu'
+nb_readouts = size[1]
 
 relearn_after_decoder_fitting = True
 do_record_data = False
@@ -32,17 +33,29 @@ do_z_score = True
 global_mean_input_is_zero = False
 fit_intercept = True
 
+
+# Create network
 net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
                                      global_mean_input_is_zero=global_mean_input_is_zero,
                                      do_z_score=do_z_score, rng_seed=seed,
                                      activation_function=activation_function)
+
+# Select readouts
+if nb_readouts > net0.network_size:
+    raise ValueError("Number of readout units must be smaller than number of units in network.")
+if nb_readouts < net0.network_size:
+    readout_units = np.nonzero(net0.mean_activity())[0][:nb_readouts]
+    net0.decoder.update_record_matrix(readout_units)
+
+
+
+
 
 data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
 net0.plot_output(outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
 print("Max abs eigvals W = ", np.max(np.abs(np.linalg.eigvals(net0.W))))
 
 print('\n|-------------------------------- Fit decoder --------------------------------|')
-
 net1 = copy.deepcopy(net0)
 intrinsic_manifold_dim, _ = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
                                              threshold=0.95, fit_intercept=fit_intercept)

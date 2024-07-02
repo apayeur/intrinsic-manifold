@@ -52,7 +52,7 @@ class NonlinearDeterministicNetwork:
         self.U, self.W, V, self.b = self.init_params(exponent_W=exponent_W)
 
         # Decoder
-        self.decoder = Decoder(V)
+        self.decoder = Decoder(np.arange(self.network_size), V)
 
         # Perturbations
         self.selected_permutation_WM = None

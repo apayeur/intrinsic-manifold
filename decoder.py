@@ -6,29 +6,35 @@ import copy
 
 
 class Decoder:
-    def __init__(self, readout_ids, rng=np.random.default_rng()):
-        self.nb_readouts = len(readout_ids)
-        self.V = rng.standard_normal(size=(2, self.nb_readouts))
+    def __init__(self, V):
+        self.nb_readouts = V.shape[1]
+        self.readout_ids = np.arange(self.nb_readouts)
+        self.nb_recurrent_units = V.shape[1]
+        self.V = V
         self.C = None  # projection matrix, shape = (intrinsic_manifold_dim, self.network_size)
         self.D = None  # decoding matrix, shape = (self.output_size, intrinsic_manifold_dim)
-        self.R = np.eye(self.nb_readouts)
-        self.update_record_matrix(readout_ids)
-        self.intercept = np.zeros(2)  # intercept of the decoder
+        self.R = None  # readout matrix
+        self.update_record_matrix(np.arange(self.nb_readouts))
+        self.intercept = np.zeros(V.shape[0])  # intercept of the decoder
         self.inv_Sv = np.eye(self.nb_readouts)  # initialization of z-scoring matrix
         self.inv_Sz = None  # matrix for z-scoring PCs
         self.ma_0 = np.zeros(self.nb_readouts)  # mean activity after initial training (used for z-scoring)
-        self.is_fitted = False
 
     def __call__(self, activity):
         return self.V @ self.R @ (activity - self.ma_0) + self.intercept
 
+    def T(self):
+        return (self.V @ self.R).T
+
     def update_record_matrix(self, recorded_units_ids):
+        self.readout_ids = recorded_units_ids
         self.nb_readouts = len(recorded_units_ids)
         self.R = np.zeros(self.nb_readouts, self.nb_recurrent_units)
         for i in range(self.nb_readouts):
             self.R[i, recorded_units_ids[i]] = 1.
 
-    def fit(self, net, intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False, do_z_score=False):
+    def fit(self, X, y,
+            intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False, do_z_score=False):
         # Check for any dead units
         alive_units = np.nonzero(np.diag(net.activity_covariance()) > 1e-5)[0]
         self.update_record_matrix(alive_units)
