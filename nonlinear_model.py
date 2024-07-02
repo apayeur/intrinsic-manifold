@@ -77,9 +77,9 @@ class NonlinearDeterministicNetwork:
     @staticmethod
     def F(v, W, c, a_fun):
         if a_fun == 'tanh':
-            return v - W @ np.tanh(v) + c
+            return v - W @ np.tanh(v) - c
         elif a_fun == 'relu':
-            return v - W @ activation_functions.relu(v) + c
+            return v - W @ activation_functions.relu(v) - c
 
     @staticmethod
     def dF(v, W, c, a_fun):
