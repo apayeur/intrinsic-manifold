@@ -1,9 +1,9 @@
-from toy_model_new import NonlinearDeterministicNetwork
+from nonlinear_model import NonlinearDeterministicNetwork
 import numpy as np
 import copy
 import os
 
-tag = f"fig1-test-linear-nonlinear"
+tag = f"fig1-linear-nonlinear-new-decoder"
 save_dir = f"data/egd/{tag}"
 save_dir_results = f"results/egd/{tag}"
 if not os.path.exists(save_dir):
@@ -24,13 +24,13 @@ nb_iter = int(500)              # nb of gradient iteration during initial traini
 nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
 seed = 0
 exponent_W = 0.55        # W_0 ~ N(0, 1/N^exponent_W)
-activation_function = 'linear'
+activation_function = 'relu'
 
 relearn_after_decoder_fitting = True
 do_record_data = False
-do_z_score = False
+do_z_score = True
 global_mean_input_is_zero = False
-fit_intercept = False
+fit_intercept = True
 
 net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
                                      global_mean_input_is_zero=global_mean_input_is_zero,
@@ -42,12 +42,13 @@ net0.plot_output(outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{out
 print("Max abs eigvals W = ", np.max(np.abs(np.linalg.eigvals(net0.W))))
 
 print('\n|-------------------------------- Fit decoder --------------------------------|')
+
 net1 = copy.deepcopy(net0)
 intrinsic_manifold_dim, _ = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
                                              threshold=0.95, fit_intercept=fit_intercept)
 net1.plot_output(outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting_seed{seed}.{output_fig_format}")
 
-'------------------------------------------- Retraining decoder -------------------------------------------'
+'---------------------------------------- Retraining with decoder ----------------------------------------'
 net2 = copy.deepcopy(net1)
 if relearn_after_decoder_fitting:
     if net2.task_loss() > 1e-4:
