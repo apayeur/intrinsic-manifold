@@ -13,7 +13,7 @@ from decoder import Decoder
 
 
 class NonlinearDeterministicNetwork:
-    def __init__(self, network_size=100, nb_inputs=6, exponent_W=0.55,
+    def __init__(self, network_size=100, nb_readouts=100, nb_inputs=6, exponent_W=0.55,
                  global_mean_input_is_zero=False, do_z_score=False, rng_seed=1, activation_function='tanh'):
         self.size = (nb_inputs, network_size, 2)
         self.input_size, self.network_size, self.output_size = self.size
@@ -21,6 +21,7 @@ class NonlinearDeterministicNetwork:
         self.global_mean_input_is_zero = global_mean_input_is_zero
         self.rng = np.random.default_rng(rng_seed)
         self.do_z_score = do_z_score
+        self.nb_readouts = nb_readouts
         self.activation_function = activation_function
         if activation_function == 'tanh':
             self.phi = np.tanh
@@ -49,10 +50,7 @@ class NonlinearDeterministicNetwork:
         for i in range(self.nb_inputs):
             self.inputs[i][i] = 1. + self.inputs[i][i]
 
-        self.U, self.W, V, self.b = self.init_params(exponent_W=exponent_W)
-
-        # Decoder
-        self.decoder = Decoder(np.arange(self.network_size), V)
+        self.U, self.W, self.b = self.init_params(exponent_W=exponent_W)
 
         # Perturbations
         self.selected_permutation_WM = None
@@ -61,23 +59,32 @@ class NonlinearDeterministicNetwork:
         # Initial conditions for potential solver
         self.prev_potentials = [self.inv_I_minus_W() @ (self.U @ self.inputs[k] + self.b) for k in range(self.nb_inputs)]
 
+        # Decoder
+        if nb_readouts > network_size:
+            raise ValueError("Number of readout units must be smaller than number of units in network.")
+        print(self.mean_activity())
+        readouts_units = np.nonzero(self.mean_activity() > 1e-6)[0][:self.nb_readouts]
+        self.nb_readouts = len(readouts_units)
+        print("Number of readout units", self.nb_readouts)
+        V = self.rng.standard_normal(size=(2, self.nb_readouts))
+        initial_decoder_fac = 0.2
+        V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / self.nb_readouts) ** 0.5
+        self.decoder = Decoder(readouts_units, self.network_size, V)
+
     def init_params(self, exponent_W):
         U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
         #U = self.rng.standard_normal(size=(self.network_size, self.input_size)) / self.input_size **
         W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
-        V = self.rng.standard_normal(size=(2, self.network_size))
-        b = np.zeros(self.network_size)  # self.rng.uniform(low=0, high=1, size=(self.network_size, ))
-        initial_decoder_fac = 0.2
-        V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / self.network_size) ** 0.5
-        return U, W, V, b
+        b = self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)
+        return U, W, b
 
     # ============= For activity solver =============
     @staticmethod
-    def F(v, W, c, a_fun):
+    def F(v, W, ff_input, a_fun):
         if a_fun == 'tanh':
-            return v - W @ np.tanh(v) + c
+            return v - W @ np.tanh(v) - ff_input
         elif a_fun == 'relu':
-            return v - W @ activation_functions.relu(v) + c
+            return v - W @ activation_functions.relu(v) - ff_input
 
     @staticmethod
     def dF(v, W, c, a_fun):
@@ -128,7 +135,7 @@ class NonlinearDeterministicNetwork:
         cma = self.conditioned_activities()
         for k in range(self.nb_inputs):
             ac += np.outer(cma[k] - self.mean_activity(), cma[k] - self.mean_activity())
-        return self.decoder.R @ ac @ self.decoder.R / self.nb_inputs
+        return self.decoder.R @ ac @ self.decoder.R.T / self.nb_inputs
 
     def activity_correlation_matrix(self):
         S_v_inv = np.diag(np.sqrt(np.diag(self.activity_covariance())) ** -1)

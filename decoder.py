@@ -6,19 +6,20 @@ import copy
 
 
 class Decoder:
-    def __init__(self, V):
+    def __init__(self, readouts_units, network_size, V):
+        assert V.shape[1] == len(readouts_units), f"Nb of readout units {len(readouts_units)} not match with nb of cols of V {V.shape[1]}"
+        self.network_size = network_size
         self.nb_readouts = V.shape[1]
-        self.readout_ids = np.arange(self.nb_readouts)
-        self.nb_recurrent_units = V.shape[1]
+        self.readout_ids = readouts_units
         self.V = V
         self.C = None  # projection matrix, shape = (intrinsic_manifold_dim, self.network_size)
         self.D = None  # decoding matrix, shape = (self.output_size, intrinsic_manifold_dim)
         self.R = None  # readout matrix
-        self.update_record_matrix(np.arange(self.nb_readouts))
+        self.update_record_matrix(readouts_units)
         self.intercept = np.zeros(V.shape[0])  # intercept of the decoder
-        self.inv_Sv = np.eye(self.nb_readouts)  # initialization of z-scoring matrix
+        self.inv_Sv = np.eye(network_size)  # initialization of z-scoring matrix
         self.inv_Sz = None  # matrix for z-scoring PCs
-        self.ma_0 = np.zeros(self.nb_readouts)  # mean activity after initial training (used for z-scoring)
+        self.ma_0 = np.zeros(network_size)  # mean activity after initial training (used for z-scoring)
 
     def __call__(self, activity):
         return self.V @ self.R @ (activity - self.ma_0) + self.intercept
@@ -29,7 +30,7 @@ class Decoder:
     def update_record_matrix(self, recorded_units_ids):
         self.readout_ids = recorded_units_ids
         self.nb_readouts = len(recorded_units_ids)
-        self.R = np.zeros(self.nb_readouts, self.nb_recurrent_units)
+        self.R = np.zeros((self.nb_readouts, self.network_size))
         for i in range(self.nb_readouts):
             self.R[i, recorded_units_ids[i]] = 1.
 

@@ -35,26 +35,16 @@ fit_intercept = True
 
 
 # Create network
-net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
+net0 = NonlinearDeterministicNetwork(network_size=size[1], nb_readouts=nb_readouts, nb_inputs=size[0], exponent_W=exponent_W,
                                      global_mean_input_is_zero=global_mean_input_is_zero,
                                      do_z_score=do_z_score, rng_seed=seed,
                                      activation_function=activation_function)
-
-# Select readouts
-if nb_readouts > net0.network_size:
-    raise ValueError("Number of readout units must be smaller than number of units in network.")
-if nb_readouts < net0.network_size:
-    readout_units = np.nonzero(net0.mean_activity())[0][:nb_readouts]
-    net0.decoder.update_record_matrix(readout_units)
-
-
-
-
 
 data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
 net0.plot_output(outfile_name=f"{save_dir_results}/SampleEndInitialTraining.{output_fig_format}")
 print("Max abs eigvals W = ", np.max(np.abs(np.linalg.eigvals(net0.W))))
 
+"""
 print('\n|-------------------------------- Fit decoder --------------------------------|')
 net1 = copy.deepcopy(net0)
 intrinsic_manifold_dim, _ = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
@@ -99,3 +89,5 @@ net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMAfterLearning_seed{
 # Save candidate perturbations losses
 np.save(f"{save_dir}/candidate_wm_perturbations", wm_total_losses)
 np.save(f"{save_dir}/candidate_om_perturbations", om_total_losses)
+
+"""
