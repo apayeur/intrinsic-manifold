@@ -11,7 +11,7 @@ output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}-subsampledOMP"
+    tag = f"fig2-NEW-Z-SCORE-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW0.55-subsampledOMP"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -38,11 +38,14 @@ for exponent_W in exponents_W:
     #loss_vbar = loss_dict['loss_vbar']
 
     seeds_to_exclude = np.where(np.sum(loss['OM'] < 0, axis=1) > 0)[0]
-    print('seeds to exclude : ', seeds_to_exclude)
-
     seeds_to_include = [i for i in range(params['nb_seeds']) if i not in seeds_to_exclude]
 
-    loss_init = loss_init[seeds_to_include]
+    if isinstance(loss_init, list):
+        tmp = [loss_init[s] for s in seeds_to_include]
+        loss_init = tmp
+    else:
+        loss_init = loss_init[seeds_to_include]
+
     for perturbation_type in ['WM', 'OM']:
         loss[perturbation_type] = loss[perturbation_type][seeds_to_include]
         #loss_var[perturbation_type] = loss_var[perturbation_type][seeds_to_include]
@@ -85,7 +88,7 @@ for exponent_W in exponents_W:
     plt.xlabel(x_label)
     plt.ylabel('$L/L_0$')
     #plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
-    #plt.xlim([0, 500])
+    plt.xlim([0, 50])
     plt.xticks(plt.gca().get_xlim())
     plt.ylim([0,1])
     plt.yticks([0,0.5,1])
@@ -128,7 +131,7 @@ for exponent_W in exponents_W:
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
     if exponent_W == 0.55:
-         plt.xlim([0, 500])
+         plt.xlim([0, 50])
          plt.xticks(plt.gca().get_xlim())
     else:
         plt.xlim([0, len(m)])

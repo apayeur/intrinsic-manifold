@@ -163,3 +163,19 @@ def plot_performance(u, targets, freqs, filename):
     plt.savefig(filename)
     plt.close()
 
+def average_uneven_lists(l):
+    """Compute average of a list of arrays of unequal lenghts."""
+    min_ = len(l[0])
+    for i in range(1, len(l)):
+        min_ = len(l[i]) if len(l[i]) < min_ else min_
+    new_list = [l[i][:min_] for i in range(len(l))]
+    return np.arange(min_), np.mean(new_list, axis=0)
+
+def std_uneven_lists(l):
+    """Compute std of a list of arrays of unequal lenghts."""
+    min_ = len(l[0])
+    for i in range(1, len(l)):
+        min_ = len(l[i]) if len(l[i]) < min_ else min_
+    new_list = [l[i][:min_] for i in range(len(l))]
+    return np.arange(min_), np.std(new_list, axis=0, ddof=1)
+

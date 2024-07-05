@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-plt.style.use('rnn4bci_plot_params.dms')
 from utils import target_colors, units_convert
 import activation_functions
 import copy
@@ -9,17 +8,15 @@ from math import factorial
 from scipy.linalg import subspace_angles
 from scipy.optimize import fsolve
 from sklearn.linear_model import LinearRegression
+from decoder import Decoder
+plt.style.use('rnn4bci_plot_params.dms')
 
 
 class NonlinearDeterministicNetwork:
-    def __init__(self, network_size=100, nb_inputs=6, exponent_W=0.55,
-                 global_mean_input_is_zero=False, do_z_score=False, rng_seed=1, activation_function='tanh'):
-        self.size = (nb_inputs, network_size, 2)
-        self.input_size, self.network_size, self.output_size = self.size
-        self.nb_inputs = nb_inputs
-        self.global_mean_input_is_zero = global_mean_input_is_zero
+    def __init__(self, network_size=100, nb_readouts=100, nb_inputs=6, exponent_W=0.55,
+                 global_mean_input_is_zero=False, rng_seed=1, activation_function='tanh'):
+        self.nb_inputs, self.network_size, self.output_size = nb_inputs, network_size, 2
         self.rng = np.random.default_rng(rng_seed)
-        self.do_z_score = do_z_score
         self.activation_function = activation_function
         if activation_function == 'tanh':
             self.phi = np.tanh
@@ -36,50 +33,52 @@ class NonlinearDeterministicNetwork:
         else:
             raise ValueError("`activation_function` must be 'tanh', 'relu' or 'linear'")
 
-        # BCI decoder attributes
-        self.C = None  # projection matrix, shape = (intrinsic_manifold_dim, self.network_size)
-        self.D = None  # decoding matrix, shape = (self.output_size, intrinsic_manifold_dim)
-        self.intercept = np.zeros(self.output_size)  # intercept of the decoder
-        self.inv_Sv = np.eye(self.network_size)  # matrix for z-scoring activity
-        self.inv_Sz = None  # matrix for z-scoring PCs
-        self.ma_0 = np.zeros(self.network_size)  # mean activity after initial training (used for z-scoring)
-
         # Targets
         self.targets = [np.array([np.cos(2 * np.pi * i / self.nb_inputs),
                                   np.sin(2 * np.pi * i / self.nb_inputs)]) for i in range(self.nb_inputs)]
 
         # Inputs
-        if self.global_mean_input_is_zero:
-            self.inputs = [-np.ones(self.input_size) / self.nb_inputs for i in range(self.nb_inputs)]
+        if global_mean_input_is_zero:
+            self.inputs = [-np.ones(self.nb_inputs) / self.nb_inputs for _ in range(self.nb_inputs)]
         else:
-            self.inputs = [np.zeros(self.input_size) for i in range(self.nb_inputs)]
+            self.inputs = [np.zeros(self.nb_inputs) for _ in range(self.nb_inputs)]
         for i in range(self.nb_inputs):
             self.inputs[i][i] = 1. + self.inputs[i][i]
 
-        self.U, self.W, self.V, self.b = self.init_params(exponent_W=exponent_W)
-
-        self.prev_potentials = [self.inv_I_minus_W() @ (self.U @ self.inputs[k] + self.b) for k in range(self.nb_inputs)] # as initial condition for solver
+        # Network parameter initialization (see # Decoder below for V)
+        self.U, self.W, self.b = self.init_params(exponent_W=exponent_W)
 
         # Perturbations
-        self.selected_permutation_WM = None
-        self.selected_permutation_OM = None
+        self.selected_permutation = {'WM': None, 'OM': None}
+
+        # Initial conditions for potential solver
+        self.prev_potentials = [self.inv_I_minus_W() @ (self.U @ self.inputs[k] + self.b) for k in range(self.nb_inputs)]
+
+        # Decoder
+        if nb_readouts > network_size:
+            raise ValueError("Number of readout units must be smaller than or equal to size of network.")
+        readouts_units = np.nonzero(np.diag(self.network_covariance()) > 1e-6)[0][:nb_readouts]
+        nb_readouts = len(readouts_units)
+        print("Number of readout units", nb_readouts)
+        V = 0.5 * self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** 0.5
+        #initial_decoder_fac = 0.2
+        #V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / nb_readouts) ** 0.5
+        self.decoder = Decoder(readouts_units, self.network_size, V)
 
     def init_params(self, exponent_W):
-        U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.input_size))
+        U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.nb_inputs))
+        # U = self.rng.standard_normal(size=(self.network_size, self.nb_inputs)) / self.nb_inputs **
         W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
-        V = self.rng.standard_normal(size=(2, self.network_size))
-        b = np.zeros(self.network_size)  # self.rng.uniform(low=0, high=1, size=(self.network_size, ))
-        initial_decoder_fac = 0.2
-        V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / self.network_size) ** 0.5
-        return U, W, V, b
+        b = self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)
+        return U, W, b
 
     # ============= For activity solver =============
     @staticmethod
-    def F(v, W, c, a_fun):
+    def F(v, W, ff_input, a_fun):
         if a_fun == 'tanh':
-            return v - W @ np.tanh(v) - c
+            return v - W @ np.tanh(v) - ff_input
         elif a_fun == 'relu':
-            return v - W @ activation_functions.relu(v) - c
+            return v - W @ activation_functions.relu(v) - ff_input
 
     @staticmethod
     def dF(v, W, c, a_fun):
@@ -91,9 +90,6 @@ class NonlinearDeterministicNetwork:
     # ==============  Statistics  ==================
     def inv_I_minus_W(self):
         return np.linalg.inv(np.eye(self.network_size) - self.W)
-
-    def average_input(self):
-        return np.mean(self.inputs, axis=0)
 
     def conditioned_potentials(self):
         """Solve F(v) = v - Wf(v) + Ux"""
@@ -122,26 +118,19 @@ class NonlinearDeterministicNetwork:
     def mean_activity(self):
         return np.mean(self.conditioned_activities(), axis=0)
 
-    def mean_potential(self):
-        return np.mean(self.conditioned_potentials(), axis=0)
-
-    def activity_covariance(self):
+    def network_covariance(self):
         ac = np.zeros((self.network_size, self.network_size))
         cma = self.conditioned_activities()
         for k in range(self.nb_inputs):
             ac += np.outer(cma[k] - self.mean_activity(), cma[k] - self.mean_activity())
         return ac / self.nb_inputs
 
-    def activity_correlation_matrix(self):
-        S_v_inv = np.diag(np.sqrt(np.diag(self.activity_covariance())) ** -1)
-        return S_v_inv @ self.activity_covariance() @ S_v_inv
-
     # ==============  Loss ================
     def task_loss(self):
         rates = self.conditioned_activities()
         L = 0.
         for k in range(self.nb_inputs):
-            error = self.V @ (rates[k] - self.ma_0) + self.intercept - self.targets[k]
+            error = self.decoder(rates[k]) - self.targets[k]
             L += np.dot(error, error)
         return 0.5 * L / self.nb_inputs
 
@@ -149,15 +138,14 @@ class NonlinearDeterministicNetwork:
         losses = np.zeros(self.nb_inputs)
         rates = self.conditioned_activities()
         for k in range(self.nb_inputs):
-            error = self.V @ (rates[k] - self.ma_0) + self.intercept - self.targets[k]
+            error = self.decoder(rates[k]) - self.targets[k]
             losses[k] = 0.5 * np.dot(error, error)
         return losses / self.nb_inputs
 
     def correlation_component_loss(self):
-        """TODO: Check if formula still valid with nonlinearity."""
-        ac = self.activity_covariance()
+        ac = self.network_covariance()
         ma = self.mean_activity()
-        return 0.5 * np.trace(self.V @ (ac + np.outer(ma, ma)) @ self.V.T)
+        return 0.5 * np.trace(self.decoder.V @ self.decoder.R @ (ac + np.outer(ma, ma)) @ self.decoder.R.T @ self.decoder.V.T)
 
     # =========  Training ==========
     def max_eigval(self, potentials):
@@ -169,16 +157,16 @@ class NonlinearDeterministicNetwork:
             grad = np.zeros_like(self.W)
             for k in range(self.nb_inputs):
                 J = self.phi_jac(potentials[k])
-                error = self.V @ (self.phi(potentials[k]) - self.ma_0) + self.intercept - self.targets[k]
-                grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.V.T @ np.outer(error, self.phi(potentials[k]))
+                error = self.decoder(self.phi(potentials[k]))- self.targets[k]
+                grad += np.linalg.inv(np.eye(self.network_size) - J@self.W.T) @ J @ self.decoder.R.T @ self.decoder.V.T @ np.outer(error, self.phi(potentials[k]))
             grad /= self.nb_inputs
         else:
-            partial_grad = np.zeros_like(self.V)
+            partial_grad = np.zeros_like(self.decoder.V @ self.decoder.R)
             for k in range(self.nb_inputs):
-                partial_grad += np.outer(self.V @ (potentials[k] - self.ma_0) + self.intercept - self.targets[k], potentials[k])
-            grad = (self.V @ self.inv_I_minus_W()).T @ partial_grad / self.nb_inputs
-        ng = np.linalg.norm(grad)
-        threshold = 1.
+                partial_grad += np.outer(self.decoder(potentials[k]) - self.targets[k], potentials[k])
+            grad = (self.decoder.V @ self.decoder.R @ self.inv_I_minus_W()).T @ partial_grad / self.nb_inputs
+        # ng = np.linalg.norm(grad)
+        # threshold = 1.
         # grad = threshold*grad/ng if ng >= threshold else grad  # gradient clipping
         return grad
 
@@ -196,7 +184,7 @@ class NonlinearDeterministicNetwork:
         else:
             data = None
 
-        var_init = self.activity_covariance()
+        readout_var_init = self.decoder.R @ self.network_covariance() @ self.decoder.R.T
 
         if stopping_crit is not None:
             nb_iter = 0
@@ -208,9 +196,9 @@ class NonlinearDeterministicNetwork:
         loss = 1e9
         initial_loss = self.task_loss()
         while i < int(nb_iter) or loss > stopping_crit:
-            var_prev = self.activity_covariance()
+            readout_var_prev = self.decoder.R @ self.network_covariance() @ self.decoder.R.T
             if do_record_data:
-                data['tot_var'].append(np.trace(var_prev))
+                data['tot_var'].append(np.trace(readout_var_prev))
             loss = self.task_loss()
 
             potentials = self.conditioned_potentials()
@@ -221,7 +209,7 @@ class NonlinearDeterministicNetwork:
             if do_record_data:
                 data['losses']['task'].append(loss if max_ev < 1 else -1)
                 data['losses']['corr'].append(self.correlation_component_loss())
-                data['pr'].append(self.participation_ratio())
+                data['pr'].append(self.participation_ratio_(readout_var_prev))
                 data['max_eigvals'].append(max_ev)
 
             if nb_iter == 0:
@@ -234,107 +222,75 @@ class NonlinearDeterministicNetwork:
             # Compute gradient
             g = self.compute_gradient()
 
-            if self.C is not None:
+            if self.decoder.C is not None:
                 if do_record_data:
                     data['norm_gradW'].append(np.linalg.norm(g))
 
                     # Compute angles
-                    Var = self.activity_covariance()
-                    # dVar = Var - var_prev
-                    # U_Var, _, VT_Var = np.linalg.svd(Var)
+                    readout_var = self.decoder.R @ self.network_covariance() @ self.decoder.R.T
+                    # dVar = readout_var - readout_var_prev
+                    # U_Var, _, VT_Var = np.linalg.svd(readout_var)
                     # upper_var = U_Var[:, :d]
                     # lower_var = U_Var[:, d:]
 
                     # data['max_angles']['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[0]))
                     # data['max_angles']['UpperVar_vs_VT'].append(np.rad2deg(subspace_angles(upper_var, self.V.T)[0]))
                     # data['max_angles']['LowerVar_vs_VT'].append(np.rad2deg(subspace_angles(lower_var, self.V.T)[0]))
-                    # data['max_angles']['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.C.T)[0]))
+                    # data['max_angles']['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.decoder.C.T)[0]))
                     #
                     # data['min_angles']['dVar_vs_VT'].append(np.rad2deg(subspace_angles(dVar, self.V.T)[-1]))
                     # data['min_angles']['UpperVar_vs_VT'].append(np.rad2deg(subspace_angles(upper_var, self.V.T)[-1]))
                     # data['min_angles']['LowerVar_vs_VT'].append(np.rad2deg(subspace_angles(lower_var, self.V.T)[-1]))
-                    # data['min_angles']['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.C.T)[-1]))
+                    # data['min_angles']['UpperVar_vs_VarBCI'].append(np.rad2deg(subspace_angles(upper_var, self.decoder.C.T)[-1]))
 
                     # Compute manifold overlap (as per Feulner and Clopath)
-                    beta1 = np.trace(self.C @ var_init @ self.C.T) / np.trace(var_init)
-                    beta2 = np.trace(self.C @ Var @ self.C.T) / np.trace(
-                        Var)  # note that self.C is never reassigned, so it stays at its initial value
+                    beta1 = np.trace(self.decoder.C @ readout_var_init @ self.decoder.C.T) / np.trace(readout_var_init)
+                    beta2 = np.trace(self.decoder.C @ readout_var @ self.decoder.C.T) / np.trace(
+                        readout_var)  # note that self.decoder.C is never reassigned, so it stays at its initial value
                     data['normalized_variance_explained'].append(beta2 / beta1)
                     data['f'].append(beta2)
 
-                    if self.selected_permutation_OM is not None:
-                        tmp1 = np.trace(self.C[:, self.selected_permutation_OM] @ Var
-                                        @ self.C[:, self.selected_permutation_OM].T)
-                        tmp2 = np.trace(self.C @ Var @ self.C.T)
+                    if self.selected_permutation['OM'] is not None:
+                        tmp1 = np.trace(self.decoder.C[:, self.selected_permutation['OM']] @ readout_var
+                                        @ self.decoder.C[:, self.selected_permutation['OM']].T)
+                        tmp2 = np.trace(self.decoder.C @ readout_var @ self.decoder.C.T)
                         data['R'].append(tmp1 / tmp2)
-                        data['rel_proj_var_OM'].append(tmp1 / np.trace(self.C[:, self.selected_permutation_OM] @ var_init @ self.C[:, self.selected_permutation_OM].T))
+                        data['rel_proj_var_OM'].append(tmp1 / np.trace(self.decoder.C[:, self.selected_permutation['OM']] @ readout_var_init @ self.decoder.C[:, self.selected_permutation['OM']].T))
 
-                    if self.selected_permutation_WM is not None:
-                        _, _, VDT = np.linalg.svd(self.D)
-                        _, _, VDT_WM = np.linalg.svd(self.D[:, self.selected_permutation_WM])
-                        data['A']['D'].append(np.trace(VDT[:2] @ self.C @ Var @ self.C.T @ VDT[:2].T))
-                        data['A']['DP_WM'].append(np.trace(VDT_WM[:2] @ self.C @ Var @ self.C.T @ VDT_WM[:2].T))
+                    if self.selected_permutation['WM'] is not None:
+                        _, _, VDT = np.linalg.svd(self.decoder.D)
+                        _, _, VDT_WM = np.linalg.svd(self.decoder.D[:, self.selected_permutation['WM']])
+                        data['A']['D'].append(np.trace(VDT[:2] @ self.decoder.C @ readout_var @ self.decoder.C.T @ VDT[:2].T))
+                        data['A']['DP_WM'].append(np.trace(VDT_WM[:2] @ self.decoder.C @ readout_var @ self.decoder.C.T @ VDT_WM[:2].T))
 
             self.W -= lr * g
             i += 1
         return data
 
-    # ============ Methods related to decoder ==============
-    def fit_decoder(self, intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False):
-        if self.do_z_score:
-            self.inv_Sv = np.diag(np.sqrt(np.diag(self.activity_covariance())) ** -1)
-            self.ma_0 = self.mean_activity()
-
-        tot_var = self.activity_correlation_matrix() if self.do_z_score else self.activity_covariance()
-        w, v = np.linalg.eig(tot_var)
-        ranked_eig_indices = np.argsort(w)[::-1]  # need to order eigensystem
-        vt = v[:, ranked_eig_indices].T
-
-        dim = self.dimensionality(threshold=threshold)
-        print(f"Number of PCs for {threshold} of total variance = {dim}")
-        if intrinsic_manifold_dim is None:
-            intrinsic_manifold_dim = dim
-
-        self.C = vt[:intrinsic_manifold_dim, :]  # projection matrix
-        self.inv_Sz = np.diag(np.sqrt(np.diag(self.C @ tot_var @ self.C.T)) ** -1) if self.do_z_score else np.eye(
-            intrinsic_manifold_dim)
-        C_loc = self.inv_Sz @ self.C @ self.inv_Sv
-
-        if not fit_intercept and not self.do_z_score:
-            # Exact solution
-            Var = self.activity_covariance()
-            vbarvbarT = np.outer(self.mean_activity(), self.mean_activity())
-            self.D = self.V @ (Var + vbarvbarT) @ C_loc.T @ np.linalg.inv(C_loc @ (Var + vbarvbarT) @ C_loc.T)
-        else:
-            lr = LinearRegression(fit_intercept=fit_intercept)
-            ca = np.asarray(self.conditioned_activities())
-            lr.fit((ca - self.ma_0) @ C_loc.T, ca @ self.V.T)
-            self.intercept = lr.intercept_ if fit_intercept else np.zeros(self.output_size)
-            self.D = lr.coef_
-            print("Fit R2:", lr.score((ca - self.ma_0) @ C_loc.T, ca @ self.V.T))
-            print("D =", self.D)
-            print("Intercept:", self.intercept)
-            #target_shift = self.D @ C_loc @ self.ma_0 - self.intercept
-            #for i in range(self.nb_inputs):
-            #    self.targets[i] += target_shift
-        self.V = self.D @ C_loc
-        return intrinsic_manifold_dim, dim
-
     def select_perturb(self, intrinsic_manifold_dim, nb_om_permuted_units=30, nb_samples=int(1e3),
                        om_select_method='original'):
+        """Select the WM and OM perturbations"""
         if om_select_method != 'original' and om_select_method != 'modified':
             raise ValueError(f"OM selection method was {om_select_method} but must be either `original` or `modified`.")
+        if om_select_method == 'original' and (nb_om_permuted_units > self.decoder.nb_readouts):
+            raise ValueError(f"Number of requested OM permuted units, {nb_om_permuted_units}, "
+                             f"should be smaller than number of readouts {self.decoder.nb_readouts}")
 
-        """Select the WM and OM perturbations"""
         nb_samples_wm = factorial(intrinsic_manifold_dim) if intrinsic_manifold_dim <= 8 else nb_samples
         nb_samples_om = max(nb_samples, nb_samples_wm) if om_select_method == 'original' else factorial(intrinsic_manifold_dim)
 
-        wm_permutations = np.empty(shape=(nb_samples_wm, intrinsic_manifold_dim))
-        om_permutations = np.empty(shape=(nb_samples_om, self.network_size))
-        wm_losses = np.empty(shape=(nb_samples_wm, self.nb_inputs))
-        om_losses = np.empty(shape=(nb_samples_om, self.nb_inputs))
-        wm_total_losses = []
-        om_total_losses = []
+        permutations = {
+            'WM': np.empty((nb_samples_wm, intrinsic_manifold_dim), dtype=int),
+            'OM': np.empty((nb_samples_om, self.decoder.nb_readouts), dtype=int)
+        }
+        input_wise_losses = {
+            'WM': np.empty((nb_samples_wm, self.nb_inputs)),
+            'OM': np.empty((nb_samples_om, self.nb_inputs))
+        }
+        total_losses = {
+            'WM': np.empty(nb_samples_wm),
+            'OM': np.empty(nb_samples_om)
+        }
 
         # WM
         if intrinsic_manifold_dim > 7:
@@ -342,22 +298,22 @@ class NonlinearDeterministicNetwork:
                 indices = np.arange(intrinsic_manifold_dim)
                 self.rng.shuffle(indices)
                 perm = indices
-                self.V = self.D[:, perm] @ self.inv_Sz @ self.C @ self.inv_Sv
-                wm_losses[perm_counter] = self.loss_for_each_target()
-                wm_permutations[perm_counter] = perm
-                wm_total_losses.append(self.task_loss())
+                self.decoder.apply_perturb(perm, 'WM')
+                input_wise_losses['WM'][perm_counter] = self.loss_for_each_target()
+                permutations['WM'][perm_counter] = perm
+                total_losses['WM'][perm_counter] = self.task_loss()
         else:  # comb over all possible permutations
             for perm_counter, perm in enumerate(itertools.permutations(range(intrinsic_manifold_dim))):
-                self.V = self.D[:, perm] @ self.inv_Sz @ self.C @ self.inv_Sv
-                wm_losses[perm_counter] = self.loss_for_each_target()
-                wm_permutations[perm_counter] = perm
-                wm_total_losses.append(self.task_loss())
-        print(f"Median total loss for WM perturbation : {np.median(wm_total_losses)}")
-        print(f"Median target-wise loss for WM perturbation : {np.median(wm_losses, axis=0)}")
+                self.decoder.apply_perturb(perm, 'WM')
+                input_wise_losses['WM'][perm_counter] = self.loss_for_each_target()
+                permutations['WM'][perm_counter] = perm
+                total_losses['WM'][perm_counter] = self.task_loss()
+        print(f"Median total loss for WM perturbation : {np.median(total_losses['WM'])}")
+        print(f"Median target-wise loss for WM perturbation : {np.median(input_wise_losses['WM'], axis=0)}")
 
         # OM
-        self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
-        mds = self.get_modulation_depth()
+        self.decoder.restore_intuitive()
+        mds = self.get_modulation_depth()[self.decoder.readout_ids]
         sorted_indices = np.argsort(mds)
 
         if om_select_method == 'original':
@@ -366,73 +322,57 @@ class NonlinearDeterministicNetwork:
             for perm_counter in range(nb_samples_om):
                 indices = copy.deepcopy(indices_to_permute)
                 self.rng.shuffle(indices)
-                indices_i = np.arange(self.network_size)
+                indices_i = np.arange(self.decoder.nb_readouts)
                 indices_i[indices_to_permute] = indices
-                self.V = self.D @ self.inv_Sz @ self.C[:, indices_i] @ self.inv_Sv
-                om_losses[perm_counter] = self.loss_for_each_target()
-                om_total_losses.append(self.task_loss())
-                om_permutations[perm_counter] = indices_i
+                self.decoder.apply_perturb(indices_i, 'OM')
+                input_wise_losses['OM'][perm_counter] = self.loss_for_each_target()
+                total_losses['OM'][perm_counter] = self.task_loss()
+                permutations['OM'][perm_counter] = indices_i
         else:
-            nb_dead_units = np.sum(np.asarray(mds) < 1e-6)
-            print('Number of dead units, from modulation depth:', nb_dead_units)
             nb_blocks = intrinsic_manifold_dim
-            nb_remaining_units = (self.network_size - nb_dead_units) % nb_blocks
+            nb_units_per_blocks = self.decoder.nb_readouts // nb_blocks
+            nb_remaining_units = self.decoder.nb_readouts % nb_blocks
 
-            # TODO: There is a less meathead way to do the following.
-            if nb_remaining_units == 0 and nb_dead_units == 0:
-                nb_units_per_blocks = self.network_size // (nb_blocks + 1)
-                nb_remaining_units = nb_units_per_blocks + self.network_size % (nb_blocks + 1)
-            if nb_remaining_units > 0 and nb_dead_units == 0:
-                nb_units_per_blocks = self.network_size // nb_blocks
-                nb_remaining_units = self.network_size % nb_blocks
-            if nb_remaining_units == 0 and nb_dead_units > 0:
-                nb_remaining_units = nb_dead_units
-                nb_units_per_blocks = (self.network_size - nb_remaining_units) % nb_blocks
-            if nb_remaining_units > 0 and nb_dead_units > 0:
-                nb_remaining_units += nb_dead_units
-                nb_units_per_blocks = (self.network_size - nb_remaining_units) % nb_blocks
             if nb_remaining_units == 0:
-                raise ValueError(f"0 remaining units, because {self.network_size}%{nb_blocks} = 0.")
-            partial_indices = sorted_indices[:-nb_remaining_units] if nb_remaining_units > 0 else sorted_indices
+                nb_units_per_blocks = (self.decoder.nb_readouts - 1) // nb_blocks
+                nb_remaining_units = 1 + (self.decoder.nb_readouts - 1) % nb_blocks
+
+            partial_indices = sorted_indices[:-nb_remaining_units]
             blocks = [partial_indices[i*nb_units_per_blocks:(i+1)*nb_units_per_blocks] for i in range(nb_blocks)]
             assert len(blocks) == intrinsic_manifold_dim, "len(block) not equal to intrinsic manifold dimension"
             s = 0
             for b in range(nb_blocks):
                 s += len(blocks[b])
             s += nb_remaining_units
-            assert s == self.network_size, f"s = {s} different for network size {self.network_size}"
+            assert s == self.decoder.nb_readouts, f"s = {s} different from nb of readouts {self.decoder.nb_readouts}"
             for perm_counter, perm in enumerate(itertools.permutations(range(intrinsic_manifold_dim))):
                 indices = np.hstack((*[blocks[i] for i in perm], sorted_indices[-nb_remaining_units:]))
-                self.V = self.D @ self.inv_Sz @ self.C[:, indices] @ self.inv_Sv
-                om_losses[perm_counter] = self.loss_for_each_target()
-                om_total_losses.append(self.task_loss())
-                om_permutations[perm_counter] = indices
+                self.decoder.apply_perturb(indices, 'OM')
+                input_wise_losses['OM'][perm_counter] = self.loss_for_each_target()
+                total_losses['OM'][perm_counter] = self.task_loss()
+                permutations['OM'][perm_counter] = indices
 
-        print(f"\nMedian total loss for OM perturbation : {np.median(om_total_losses)}")
-        print(f"Median target-wise loss for OM perturbation : {np.median(om_losses, axis=0)}")
+        print(f"\nMedian total loss for OM perturbation : {np.median(total_losses['OM'])}")
+        print(f"Median target-wise loss for OM perturbation : {np.median(input_wise_losses['OM'], axis=0)}\n")
 
         # Return to original mapping
-        self.V = self.D @ self.inv_Sz @ self.C @ self.inv_Sv
+        self.decoder.restore_intuitive()
 
         # Compute median target-specific losses across all WM and OM permutations
-        median_per_target_loss = np.median(np.vstack((wm_losses, om_losses)), axis=0, keepdims=True)
-        print(f'\nCombined median per-target loss = {median_per_target_loss}')
+        # median_per_target_loss = np.median(np.vstack((input_wise_losses['WM'], input_wise_losses['OM'])), axis=0, keepdims=True)
+        # print(f'\nCombined median per-target loss = {median_per_target_loss}')
+        # print(f'Combined median total loss = {np.sum(median_per_target_loss)}')
 
-        # Find WM and OM permutations closest to median WM perturbations
-        normed_diff = np.linalg.norm(wm_losses - median_per_target_loss, axis=1)
-        selected_wm = wm_permutations[np.argmin(normed_diff)]
-        self.selected_permutation_WM = np.asarray(selected_wm, dtype=int)
+        # Find WM and OM permutations closest to median perturbations
+        for pert_type in ['WM', 'OM']:
+            # normed_diff = np.linalg.norm(input_wise_losses[pert_type] - median_per_target_loss, axis=1)  # DEBUG !!!
+            normed_diff = np.linalg.norm(input_wise_losses[pert_type] -
+                                         np.median(input_wise_losses[pert_type], axis=0), axis=1)
+            self.selected_permutation[pert_type] = permutations[pert_type][np.argmin(normed_diff)]
+            print(f"Target-wise loss for selected {pert_type} perturbation : "
+                  f"{input_wise_losses[pert_type][np.argmin(normed_diff)]}")
 
-        normed_diff = np.linalg.norm(om_losses - median_per_target_loss, axis=1)
-        selected_om = om_permutations[np.argmin(normed_diff)]
-        self.selected_permutation_OM = np.asarray(selected_om, dtype=int)
-        return self.selected_permutation_WM, self.selected_permutation_OM, wm_total_losses, om_total_losses
-
-    def apply_wm_perturb(self, selected_wm):
-        self.V = self.D[:, selected_wm] @ self.inv_Sz @ self.C @ self.inv_Sv
-
-    def apply_om_perturb(self, selected_om):
-        self.V = self.D @ self.inv_Sz @ self.C[:, selected_om] @ self.inv_Sv
+        return self.selected_permutation, total_losses
 
     def get_modulation_depth(self):
         """
@@ -450,7 +390,7 @@ class NonlinearDeterministicNetwork:
             lr.fit(np.array(self.targets), ca[:, i])
             r = lr.predict(np.array(self.targets))
             mds.append(np.max(r) - np.min(r))
-        return mds
+        return np.array(mds)
 
     # ============ Methods related to dimensionality ==============
     @staticmethod
@@ -461,23 +401,23 @@ class NonlinearDeterministicNetwork:
         return np.nonzero(cum_var > threshold * cum_var[-1])[0][0] + 1  # +1 because array elements start at zero
 
     def dimensionality(self, threshold=0.99):
-        return self.dimensionality_(self.activity_correlation_matrix(), threshold) if self.do_z_score \
-            else self.dimensionality_(self.activity_covariance(), threshold)
+        readout_cov = self.decoder.R @ self.network_covariance() @ self.decoder.R.T
+        return self.dimensionality_(readout_cov, threshold)
 
     @staticmethod
     def participation_ratio_(covariance_matrix):
         return (np.trace(covariance_matrix)) ** 2 / np.trace(covariance_matrix @ covariance_matrix)
 
     def participation_ratio(self):
-        return self.participation_ratio_(self.activity_correlation_matrix()) if self.do_z_score \
-            else self.participation_ratio_(self.activity_covariance())
+        readout_cov = self.decoder.R @ self.network_covariance() @ self.decoder.R.T
+        return self.participation_ratio_(readout_cov)
 
     #  ========  Plotting functions  =========
     def plot_output(self, outfile_name=None):
         plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
         rates = self.conditioned_activities()
         for k in range(self.nb_inputs):
-            u = self.V @ (rates[k] - self.ma_0) + self.intercept
+            u = self.decoder(rates[k])
             plt.scatter(u[0], u[1], s=8,
                         facecolor=target_colors[k], edgecolors='white', lw=0.2, zorder=10)
             plt.scatter(self.targets[k][0], self.targets[k][1], s=13,

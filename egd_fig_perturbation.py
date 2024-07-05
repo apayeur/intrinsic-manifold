@@ -13,14 +13,14 @@ plt.style.use('rnn4bci_plot_params.dms')
 exponent_W = 0.55
 seed = 1
 #tag = f"exponent_W{exponent_W}-lr0.001-M6-iterAdapt500"
-tag = f"fig2-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW0.55-subsampledOMP"
+tag = f"fig1-linear-nonlinear-new-decoder"
 load_dir = f"data/egd/{tag}"
 save_fig_dir = f"results/egd/{tag}"
 if not os.path.exists(save_fig_dir):
     os.makedirs(save_fig_dir)
 
-wm = np.load(f"{load_dir}/candidate_wm_perturbations_seed{seed}.npy")
-om = np.load(f"{load_dir}/candidate_om_perturbations_seed{seed}.npy")
+wm = np.load(f"{load_dir}/candidate_wm_perturbations.npy")
+om = np.load(f"{load_dir}/candidate_om_perturbations.npy")
 median_ = np.median(np.concatenate((wm[:, None], om[:, None])))
 
 plt.figure(figsize=(36*units_convert['mm'], 36*units_convert['mm']))

@@ -9,15 +9,17 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 101, 2)              # (input size, recurrent size, output size)
+    size = (6, 500, 2)              # (input size, recurrent size, output size)
+    nb_readouts = 100
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     noise = 1e-2
-    lr_init = 1e-2  # 3e-2                  # learning rate for initial training
+    lr_init = 5e-2  # 3e-2                  # learning rate for initial training
     lr_decod = lr_init
-    lr = 1e-3  # 1e-3                       # learning rate during adaptation
+    lr = 5e-3  # 1e-3                       # learning rate during adaptation
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
-    nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
+    nb_iter_adapt = int(2e2)        # nb of gradient iteration during adaptation
     seeds = np.arange(5, dtype=int)
+    stopping_crit_init = 5e-3
     exponents_W = [0.55]        # W_0 ~ N(0, 1/N^exponent_W)
     nb_om_permuted_units = size[1] # size[1]  # default : size[1]
 
@@ -25,11 +27,11 @@ def main():
     do_z_score = True
     fit_intercept = True
     global_mean_input_is_zero = False
-    relearn_after_decoder_fitting = False
+    relearn_after_decoder_fitting = True
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = (f"fig2-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+        tag = (f"fig2-larger-other-m{intrinsic_manifold_dim}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
                f"-fitinter{fit_intercept}-expW{exponent_W}-subsampledOMP")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
@@ -41,7 +43,7 @@ def main():
         # DEFINITION OF DATA CONTAINERS FOR SAVED DATA
         if do_record_data:
             # Total losses
-            loss_init = np.empty(shape=(len(seeds), nb_iter))
+            loss_init = []
             loss = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
                     'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
             # Loss components
@@ -110,58 +112,55 @@ def main():
         for seed_id, seed in enumerate(seeds):
             print(f'\n|================================= Seed {seed} ===================================|')
             print('\n|----------------------------- Initial training -----------------------------|')
-            net0 = NoisyLinearNetwork(network_size=size[1], nb_inputs=size[0], exponent_W=exponent_W,
-                                                 global_mean_input_is_zero=global_mean_input_is_zero,
-                                                 do_z_score=do_z_score, rng_seed=seed_id, noise=noise)
-            data = net0.train(lr=lr_init, nb_iter=nb_iter, do_record_data=do_record_data)
+            net0 = NoisyLinearNetwork(network_size=size[1], nb_readouts=nb_readouts, nb_inputs=size[0],
+                                      exponent_W=exponent_W, global_mean_input_is_zero=global_mean_input_is_zero,
+                                      rng_seed=seed_id, noise=noise)
+            data = net0.train(lr=lr_init, stopping_crit=stopping_crit_init, do_record_data=do_record_data)
 
-            # compute participation ratio
             if do_record_data:
-                p_ratio['initial'][seed_id] = net0.participation_ratio()
-
-            # save loss
-            if do_record_data:
-                loss_init[seed_id] = data['losses']['task']
+                loss_init.append(data['losses']['task'])
+                #p_ratio['initial'][seed_id] = net0.participation_ratio()
 
             if seed_id == 0:
                 net0.plot_output(outfile_name=f"{save_dir_results}/SampleEndInitialTraining_seed{seed}.{output_fig_format}")
 
             print('\n|-------------------------------- Fit decoder --------------------------------|')
             net1 = copy.deepcopy(net0)
+            activities, _ = net1.sample(nb_epochs=100)
             if do_record_data:
-                intrinsic_manifold_dim, real_dims[seed_id] = net1.fit_decoder(intrinsic_manifold_dim=intrinsic_manifold_dim,
-                                                                              threshold=0.95, fit_intercept=fit_intercept)
+                intrinsic_manifold_dim, real_dims[seed_id] = net1.decoder.fit(activities,
+                                                                              net1.network_covariance(),
+                                                                              intrinsic_manifold_dim=intrinsic_manifold_dim,
+                                                                              fit_intercept=fit_intercept,
+                                                                              do_z_score=do_z_score)
             else:
-                intrinsic_manifold_dim, _ = net1.fit_decoder(
-                    intrinsic_manifold_dim=intrinsic_manifold_dim,
-                    threshold=0.95, fit_intercept=fit_intercept)
+                intrinsic_manifold_dim, _ = net1.decoder.fit(np.asarray(net1.conditioned_activities()),
+                                                             net1.network_covariance(),
+                                                             intrinsic_manifold_dim=intrinsic_manifold_dim,
+                                                             fit_intercept=fit_intercept, do_z_score=do_z_score)
 
             net1.plot_output(outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting_seed{seed}.{output_fig_format}")
-            V_0 = copy.deepcopy(net1.V)
 
             '------------------------------------------- Retraining decoder -------------------------------------------'
             net2 = copy.deepcopy(net1)
             if relearn_after_decoder_fitting:
-                if net2.task_loss() > 1e-4:
+                if net2.task_loss() > stopping_crit_init:
                     print(
                         '\n|-------------------------------- Re-training with decoder --------------------------------|')
                     print("task loss after initial training:", net2.task_loss())
-                    net2.train(lr=lr_decod, nb_iter=nb_iter // 2)
+                    net2.train(lr=lr_decod, stopping_crit=stopping_crit_init)
                     net2.plot_output(outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder_seed{seed}.{output_fig_format}")
 
             print('\n|-------------------------------- Select perturbations --------------------------------|')
-            selected_wm, selected_om, wm_t_l, om_t_l = \
-                net2.select_perturb(intrinsic_manifold_dim,
-                                    nb_om_permuted_units=nb_om_permuted_units,
-                                    nb_samples=int(1e3), om_select_method='modified')
-            np.save(f"{save_dir}/candidate_wm_perturbations_seed{seed}", wm_t_l)
-            np.save(f"{save_dir}/candidate_om_perturbations_seed{seed}", om_t_l)
+            selected_perm, t_l = \
+                net2.select_perturb(intrinsic_manifold_dim, nb_om_permuted_units=nb_readouts, nb_samples=int(1e3),
+                                    om_select_method='modified')
+            np.save(f"{save_dir}/candidate_wm_perturbations_seed{seed}", t_l['WM'])
+            np.save(f"{save_dir}/candidate_om_perturbations_seed{seed}", t_l['OM'])
 
             print('\n|-------------------------------- WM perturbation --------------------------------|')
             net_wm = copy.deepcopy(net2)
-            net_wm.apply_wm_perturb(selected_wm)  # apply WM perturbation
-            if do_record_data:
-                output_matrix_angles['WM'][seed_id] = np.rad2deg(subspace_angles(V_0.T, net_wm.V.T))
+            net_wm.decoder.apply_perturb(selected_perm['WM'], 'WM')  # apply WM perturbation
 
             net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMBeforeLearning_seed{seed}.{output_fig_format}")
 
@@ -190,9 +189,7 @@ def main():
 
             print('\n|-------------------------------- OM perturbation --------------------------------|')
             net_om = copy.deepcopy(net2)
-            net_om.apply_om_perturb(selected_om)  # apply OM perturbation
-            if do_record_data:
-                output_matrix_angles['OM'][seed_id] = np.rad2deg(subspace_angles(V_0.T, net_om.V.T))
+            net_om.decoder.apply_perturb(selected_perm['OM'], 'OM')  # apply OM perturbation
 
             net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMBeforeLearning_seed{seed}.{output_fig_format}")
 
@@ -245,15 +242,7 @@ def main():
             # Save principal angles
             np.save(f"{save_dir}/principal_angles_min", min_angles)
             np.save(f"{save_dir}/principal_angles_max", max_angles)
-            np.save(f"{save_dir}/output_matrix_angles", output_matrix_angles)
-            print("Min angle WM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['WM'][:,1]),
-                                                          np.std(output_matrix_angles['WM'][:,1], ddof=1)/len(seeds)**0.5))
-            print("Max angle WM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['WM'][:, 0]),
-                                                          np.std(output_matrix_angles['WM'][:, 0], ddof=1) / len(seeds) ** 0.5))
-            print("Min angle OM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['OM'][:, 1]),
-                                                          np.std(output_matrix_angles['OM'][:, 1], ddof=1) / len(seeds) ** 0.5))
-            print("Max angle OM vs V_0: {} +/- {}".format(np.mean(output_matrix_angles['OM'][:, 0]),
-                                                          np.std(output_matrix_angles['OM'][:, 0], ddof=1) / len(seeds) ** 0.5))
+
             # Save normalized variance explained
             np.save(f"{save_dir}/normalized_variance_explained", normalized_variance_explained)
 
