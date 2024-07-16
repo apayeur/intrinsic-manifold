@@ -5,13 +5,13 @@ from utils import units_convert, col_o, col_w
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55] #, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [0.55, 1] #, 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-NEW-Z-SCORE-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW0.55-subsampledOMP"
+    tag = f"fig2-linearized-N100-linear-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -88,7 +88,7 @@ for exponent_W in exponents_W:
     plt.xlabel(x_label)
     plt.ylabel('$L/L_0$')
     #plt.title(f"Learning rate = {params['lr_adapt'][1]}", pad=0)
-    plt.xlim([0, 50])
+    plt.xlim([0, 500])
     plt.xticks(plt.gca().get_xlim())
     plt.ylim([0,1])
     plt.yticks([0,0.5,1])
@@ -131,7 +131,7 @@ for exponent_W in exponents_W:
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
     if exponent_W == 0.55:
-         plt.xlim([0, 50])
+         plt.xlim([0, 500])
          plt.xticks(plt.gca().get_xlim())
     else:
         plt.xlim([0, len(m)])

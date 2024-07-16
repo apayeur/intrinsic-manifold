@@ -33,7 +33,7 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 200, 2)              # (input size, recurrent size, output size)
+    size = (6, 100, 2)              # (input size, recurrent size, output size)
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     nb_readouts = 100  # size[1]
     lr_init = 5e-3  # 3e-2                  # learning rate for initial training
@@ -42,7 +42,7 @@ def main():
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seeds = np.arange(5, dtype=int)
-    exponents_W = [0.5]        # W_0 ~ N(0, 1/N^exponent_W)
+    exponents_W = [0.55]        # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'relu'
 
     relearn_after_decoder_fitting = True

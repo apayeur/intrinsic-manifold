@@ -54,6 +54,12 @@ class NonlinearDeterministicNetwork:
         # Initial conditions for potential solver
         self.prev_potentials = [self.inv_I_minus_W() @ (self.U @ self.inputs[k] + self.b) for k in range(self.nb_inputs)]
 
+        # Only used in LinearizedModel, but needs to be defined here 'cause I suck at coding
+        self.init_conditional_potentials = self.conditioned_potentials()
+        self.jac_init = [self.phi_jac(v) for v in self.init_conditional_potentials]
+        self.inv_I_minus_W_init = self.inv_I_minus_W()
+        self.W0 = copy.copy(self.W)
+
         # Decoder
         if nb_readouts > network_size:
             raise ValueError("Number of readout units must be smaller than or equal to size of network.")
