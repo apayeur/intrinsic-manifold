@@ -127,8 +127,9 @@ class NonlinearDeterministicNetwork:
     def network_covariance(self):
         ac = np.zeros((self.network_size, self.network_size))
         cma = self.conditioned_activities()
+        global_mean = np.mean(cma, axis=0)
         for k in range(self.nb_inputs):
-            ac += np.outer(cma[k] - self.mean_activity(), cma[k] - self.mean_activity())
+            ac += np.outer(cma[k] - global_mean, cma[k] - global_mean)
         return ac / self.nb_inputs
 
     # ==============  Loss ================
