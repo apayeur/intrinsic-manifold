@@ -51,6 +51,7 @@ def get_permutation_matrix(size, rng=np.random.default_rng()):
         P[i, indices[i]] = 1.
     return P, indices
 
+
 def heap_permutation(k, arr):
     """Heap's algorithm to generate permutations"""
     if k == 1:
@@ -63,6 +64,7 @@ def heap_permutation(k, arr):
             else:
                 arr[0], arr[k-1] = arr[k-1], arr[0]
             heap_permutation(k - 1, arr)
+
 
 def gram_schmidt(list_of_vectors):
     def vector_projection(a, u):
@@ -80,6 +82,7 @@ def gram_schmidt(list_of_vectors):
             ortho_list.append(list_of_vectors[i] / np.linalg.norm(list_of_vectors[i]))
     return ortho_list
 
+
 # --- Plotting functions --- #
 def plot_variances(iter_var, pop_shared_var, pop_private_var, dimension_var, outfile_name):
     #f'{results_folder}/SharedVariance.png'
@@ -95,6 +98,7 @@ def plot_variances(iter_var, pop_shared_var, pop_private_var, dimension_var, out
     plt.tight_layout()
     plt.savefig(outfile_name)
     plt.close()
+
 
 def plot_projections(potent_space_projections, null_space_projections, outfile_name):
     fig, axes = plt.subplots(ncols=2, figsize=(4, 2 / 1.25), sharex=True, sharey=True)
@@ -115,6 +119,7 @@ def plot_projections(potent_space_projections, null_space_projections, outfile_n
     plt.tight_layout()
     plt.savefig(outfile_name)
     plt.close()
+
 
 def plot_svd(singular_values, outfile_name):
     fig, axes = plt.subplots(ncols=2, figsize=(4, 2 / 1.25))
@@ -142,6 +147,7 @@ def plot_svd(singular_values, outfile_name):
     plt.savefig(outfile_name)
     plt.close()
 
+
 def plot_performance(u, targets, freqs, filename):
     plt.figure(figsize=(2, 2))
     if u.shape[0] == 2:
@@ -163,19 +169,12 @@ def plot_performance(u, targets, freqs, filename):
     plt.savefig(filename)
     plt.close()
 
-def average_uneven_lists(l):
-    """Compute average of a list of arrays of unequal lenghts."""
-    min_ = len(l[0])
-    for i in range(1, len(l)):
-        min_ = len(l[i]) if len(l[i]) < min_ else min_
-    new_list = [l[i][:min_] for i in range(len(l))]
-    return np.arange(min_), np.mean(new_list, axis=0)
 
-def std_uneven_lists(l):
-    """Compute std of a list of arrays of unequal lenghts."""
+def convert_uneven_lists_to_array(l):
+    """Convert of a list of arrays of unequal lenghts to an array."""
     min_ = len(l[0])
     for i in range(1, len(l)):
         min_ = len(l[i]) if len(l[i]) < min_ else min_
     new_list = [l[i][:min_] for i in range(len(l))]
-    return np.arange(min_), np.std(new_list, axis=0, ddof=1)
+    return np.array(new_list)
 

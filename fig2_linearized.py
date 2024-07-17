@@ -8,7 +8,7 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 500, 2)              # (input size, recurrent size, output size)
+    size = (6, 100, 2)              # (input size, recurrent size, output size)
     nb_readouts = 100
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     lr_init = 5e-2 #3e-2                  # learning rate for initial training
@@ -17,8 +17,9 @@ def main():
     nb_iter = int(5e2)              # nb of gradient iteration during initial training
     nb_iter_adapt = int(5e2)        # nb of gradient iteration during adaptation
     seeds = np.arange(1, dtype=int)
-    exponents_W = [0.55, 1]        # W_0 ~ N(0, 1/N^exponent_W)
+    exponents_W = [0.55]        # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'linear'
+    stopping_crit = 1e-3
 
     relearn_after_decoder_fitting = True
     do_record_data = True
@@ -41,54 +42,54 @@ def main():
         if do_record_data:
             # Total losses
             loss_init = []
-            loss = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                    'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            loss = {'WM': [],
+                    'OM': []}
             # Loss components
-            loss_corr = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                         'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            loss_corr = {'WM': [],
+                         'OM': []}
 
             # Initial manifold dimension
             real_dims = np.empty(shape=(len(seeds, )))
 
             # Principal angles
-            min_angles = {'WM': {'dVar_vs_VT': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                 'UpperVar_vs_VT': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                 'LowerVar_vs_VT': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                 'UpperVar_vs_VarBCI': np.empty(shape=(len(seeds), nb_iter_adapt))},
-                          'OM': {'dVar_vs_VT': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                 'UpperVar_vs_VT': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                 'LowerVar_vs_VT': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                 'UpperVar_vs_VarBCI': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            min_angles = {'WM': {'dVar_vs_VT': [],
+                                 'UpperVar_vs_VT': [],
+                                 'LowerVar_vs_VT': [],
+                                 'UpperVar_vs_VarBCI': []},
+                          'OM': {'dVar_vs_VT': [],
+                                 'UpperVar_vs_VT': [],
+                                 'LowerVar_vs_VT': [],
+                                 'UpperVar_vs_VarBCI': []}
                           }
             max_angles = copy.deepcopy(min_angles)
 
             # Norm of grad W
-            norm_gradW = {'loss': {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                   'OM': np.empty(shape=(len(seeds), nb_iter_adapt))},
-                          'loss_tot_var': {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                           'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}}
+            norm_gradW = {'loss': {'WM': [],
+                                   'OM': []},
+                          'loss_tot_var': {'WM': [],
+                                           'OM': []}}
 
             # Normalized variance explained
-            normalized_variance_explained = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                                             'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            normalized_variance_explained = {'WM': [],
+                                             'OM': []}
 
             # Ratio of projected variance (OM)
-            R = np.empty(shape=(len(seeds), nb_iter_adapt))
+            R = []
 
             # tr(C_OM @ Var @ C_OM.T) / tr(C_OM @ Var_init @ C_OM.T)
-            rel_proj_var_OM = np.empty(shape=(len(seeds), nb_iter_adapt))
+            rel_proj_var_OM = []
 
             # tr(C @ Var @ C.T) / tr(Var)
-            f = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                 'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            f = {'WM': [],
+                 'OM': []}
 
             # Amount of covariability projected along the row space of D
-            A = {'D': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                 'DP_WM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            A = {'D': [],
+                 'DP_WM': []}
 
             # Total variance
-            tot_var = {'WM': np.empty(shape=(len(seeds), nb_iter_adapt)),
-                       'OM': np.empty(shape=(len(seeds), nb_iter_adapt))}
+            tot_var = {'WM': [],
+                       'OM': []}
 
             # Candidate perturbation losses
             wm_total_losses, om_total_losses = None, None
@@ -107,7 +108,7 @@ def main():
             net0 = LinearizedModel(network_size=size[1], nb_readouts=nb_readouts, nb_inputs=size[0],
                                    exponent_W=exponent_W, global_mean_input_is_zero=global_mean_input_is_zero,
                                    rng_seed=seed_id)
-            data = net0.train(lr=lr_init, stopping_crit=1e-5, do_record_data=do_record_data)
+            data = net0.train(lr=lr_init, stopping_crit=0.1*stopping_crit, do_record_data=do_record_data)
 
             if do_record_data:
                 # p_ratio['initial'][seed_id] = net0.participation_ratio()
@@ -137,11 +138,11 @@ def main():
             '------------------------------------------- Retraining decoder -------------------------------------------'
             net2 = copy.deepcopy(net1)
             if relearn_after_decoder_fitting:
-                if net2.task_loss() > 1e-4:
+                if net2.task_loss() > stopping_crit:
                     print(
                         '\n|-------------------------------- Re-training with decoder --------------------------------|')
                     print("task loss after initial training:", net2.task_loss())
-                    net2.train(lr=lr_decod, nb_iter=nb_iter // 2)
+                    net2.train(lr=lr_decod, stopping_crit=stopping_crit)
                     net2.plot_output(
                         outfile_name=f"{save_dir_results}/SampleRetrainingWithDecoder_seed{seed}.{output_fig_format}")
 
@@ -158,27 +159,26 @@ def main():
 
             net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMBeforeLearning_seed{seed}.{output_fig_format}")
 
-            data = net_wm.train(lr=lr, nb_iter=nb_iter_adapt)
+            data = net_wm.train(lr=lr, stopping_crit=stopping_crit)
 
             net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMAfterLearning_seed{seed}.{output_fig_format}")
 
             if do_record_data:
-                loss['WM'][seed_id] = data['losses']['task']
-                loss_corr['WM'][seed_id] = data['losses']['corr']
-                norm_gradW['loss']['WM'][seed_id] = data['norm_gradW']
+                loss['WM'].append(data['losses']['task'])
+                loss_corr['WM'].append(data['losses']['corr'])
+                norm_gradW['loss']['WM'].append(data['norm_gradW'])
 
-                normalized_variance_explained['WM'][seed_id] = data['normalized_variance_explained']
-                A['D'][seed_id] = data['A']['D']
-                A['DP_WM'][seed_id] = data['A']['DP_WM']
-                f['WM'][seed_id] = data['f']
-                tot_var['WM'][seed_id] = data['tot_var']
+                normalized_variance_explained['WM'].append(data['normalized_variance_explained'])
+                A['D'].append(data['A']['D'])
+                A['DP_WM'].append(data['A']['DP_WM'])
+                f['WM'].append(data['f'])
+                tot_var['WM'].append(data['tot_var'])
 
                 # for key in min_angles['WM'].keys():
                 #    min_angles['WM'][key][seed_id] = data['min_angles'][key]
                 #    max_angles['WM'][key][seed_id] = data['max_angles'][key]
 
                 p_ratio['WM'][seed_id] = net_wm.participation_ratio()
-
                 total_change_W_Fnorm['WM'][seed_id] = np.linalg.norm(net_wm.W - net0.W)
 
             print('\n|-------------------------------- OM perturbation --------------------------------|')
@@ -187,27 +187,25 @@ def main():
 
             net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMBeforeLearning_seed{seed}.{output_fig_format}")
 
-            data = net_om.train(lr=lr, nb_iter=nb_iter_adapt)
+            data = net_om.train(lr=lr, stopping_crit=stopping_crit)
 
             net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMAfterLearning_seed{seed}.{output_fig_format}")
 
             if do_record_data:
-                loss['OM'][seed_id] = data['losses']['task']
-                loss_corr['OM'][seed_id] = data['losses']['corr']
-                norm_gradW['loss']['OM'][seed_id] = data['norm_gradW']
+                loss['OM'].append(data['losses']['task'])
+                loss_corr['OM'].append(data['losses']['corr'])
+                norm_gradW['loss']['OM'].append(data['norm_gradW'])
 
-                normalized_variance_explained['OM'][seed_id] = data['normalized_variance_explained']
-
-                R[seed_id] = data['R']
-                f['OM'][seed_id] = data['f']
-                tot_var['OM'][seed_id] = data['tot_var']
-                rel_proj_var_OM[seed_id] = data['rel_proj_var_OM']
+                normalized_variance_explained['OM'].append(data['normalized_variance_explained'])
+                R.append(data['R'])
+                f['OM'].append(data['f'])
+                tot_var['OM'].append(data['tot_var'])
+                rel_proj_var_OM.append(data['rel_proj_var_OM'])
                 # for key in min_angles['WM'].keys():
                 #    min_angles['OM'][key][seed_id] = data['min_angles'][key]
                 #    max_angles['OM'][key][seed_id] = data['max_angles'][key]
 
                 p_ratio['OM'][seed_id] = net_om.participation_ratio()
-
                 total_change_W_Fnorm['OM'][seed_id] = np.linalg.norm(net_om.W - net0.W)
 
         if do_record_data:
@@ -260,6 +258,7 @@ def main():
 
             # Save Frobenius norm of total weight change
             np.save(f"{save_dir}/total_change_W_Fnorm", total_change_W_Fnorm)
+
 
 if __name__ == '__main__':
     main()
