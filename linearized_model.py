@@ -1,6 +1,7 @@
 import numpy as np
-from nonlinear_model import NonlinearDeterministicNetwork
 import copy
+from nonlinear_model import NonlinearDeterministicNetwork
+from decoder import Decoder
 
 
 class LinearizedModel(NonlinearDeterministicNetwork):
@@ -11,11 +12,34 @@ class LinearizedModel(NonlinearDeterministicNetwork):
                          global_mean_input_is_zero=global_mean_input_is_zero, rng_seed=rng_seed,
                          activation_function=activation_function)
 
+        self.init_conditional_potentials = self.conditioned_potentials()
+        self.jac_init = [self.phi_jac(v) for v in self.init_conditional_potentials]
+        self.inv_I_minus_W_init = self.inv_I_minus_W()
+        self.W0 = copy.copy(self.W)
+
         self.prefactors_grad = []
         for k in range(self.nb_inputs):
             self.prefactors_grad.append(
                 np.linalg.inv(np.eye(self.network_size) - self.W0 @ self.jac_init[k]).T @ self.jac_init[k]
             )
+
+    def init_decoder(self, nb_readouts):
+        if nb_readouts > self.network_size:
+            raise ValueError("Number of readout units must be smaller than or equal to size of network.")
+        ac = np.zeros((self.network_size, self.network_size))
+
+        cma = super().conditioned_activities()
+        global_mean = np.mean(cma, axis=0)
+        for k in range(self.nb_inputs):
+            ac += np.outer(cma[k] - global_mean, cma[k] - global_mean)
+        ac /= self.nb_inputs
+        readouts_units = np.nonzero(np.diag(ac) > 1e-6)[0][:nb_readouts]
+        nb_readouts = len(readouts_units)
+        print("Number of readout units", nb_readouts)
+        V = 0.5 * self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** 0.5
+        #initial_decoder_fac = 0.2
+        #V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / nb_readouts) ** 0.5
+        self.decoder = Decoder(readouts_units, self.network_size, V)
 
     def conditioned_activities(self):
         cps = []

@@ -8,7 +8,7 @@ def main():
     output_fig_format = 'png'
 
     # Parameters
-    size = (6, 500, 2)              # (input size, recurrent size, output size)
+    size = (6, 100, 2)              # (input size, recurrent size, output size)
     nb_readouts = 100
     intrinsic_manifold_dim = 5      # dimension of manifold for control (M)
     lr_init = 5e-2 #3e-2                  # learning rate for initial training

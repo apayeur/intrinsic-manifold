@@ -54,14 +54,18 @@ class NonlinearDeterministicNetwork:
         # Initial conditions for potential solver
         self.prev_potentials = [self.inv_I_minus_W() @ (self.U @ self.inputs[k] + self.b) for k in range(self.nb_inputs)]
 
-        # Only used in LinearizedModel, but needs to be defined here 'cause I suck at coding
-        self.init_conditional_potentials = self.conditioned_potentials()
-        self.jac_init = [self.phi_jac(v) for v in self.init_conditional_potentials]
-        self.inv_I_minus_W_init = self.inv_I_minus_W()
-        self.W0 = copy.copy(self.W)
-
         # Decoder
-        if nb_readouts > network_size:
+        self.init_decoder(nb_readouts)
+
+    def init_params(self, exponent_W):
+        U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.nb_inputs))
+        # U = self.rng.standard_normal(size=(self.network_size, self.nb_inputs)) / self.nb_inputs **
+        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
+        b = self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)
+        return U, W, b
+
+    def init_decoder(self, nb_readouts):
+        if nb_readouts > self.network_size:
             raise ValueError("Number of readout units must be smaller than or equal to size of network.")
         readouts_units = np.nonzero(np.diag(self.network_covariance()) > 1e-6)[0][:nb_readouts]
         nb_readouts = len(readouts_units)
@@ -71,12 +75,6 @@ class NonlinearDeterministicNetwork:
         #V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / nb_readouts) ** 0.5
         self.decoder = Decoder(readouts_units, self.network_size, V)
 
-    def init_params(self, exponent_W):
-        U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.nb_inputs))
-        # U = self.rng.standard_normal(size=(self.network_size, self.nb_inputs)) / self.nb_inputs **
-        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
-        b = self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)
-        return U, W, b
 
     # ============= For activity solver =============
     @staticmethod
