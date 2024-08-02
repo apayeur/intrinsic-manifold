@@ -49,7 +49,7 @@ class Decoder:
                     total_new_ids += 1
             self.V = new_V
 
-    def fit(self, activities, network_covariance, intrinsic_manifold_dim=None, fit_intercept=False, do_z_score=False):
+    def fit(self, activities, network_covariance, intrinsic_manifold_dim=None, threshold=0.95, fit_intercept=False, do_z_score=False):
         R_0 = copy.copy(self.R)
         V_0 = copy.copy(self.V)
 
@@ -77,8 +77,8 @@ class Decoder:
 
         cum_var = np.cumsum(w[ranked_eig_indices])
         assert w[ranked_eig_indices][0] > w[ranked_eig_indices][1]
-        dim = np.nonzero(cum_var > 0.95 * cum_var[-1])[0][0] + 1  # +1 because how arrays are indexed
-        print(f"Number of dimension for 95% of total variance = {dim}")
+        dim = np.nonzero(cum_var > threshold * cum_var[-1])[0][0] + 1  # +1 because how arrays are indexed
+        print(f"Number of dimension for {threshold}% of total variance = {dim}")
         if intrinsic_manifold_dim is None:
             intrinsic_manifold_dim = dim
             print(f"Dimension of intrinsic manifold was set to {dim}")
@@ -110,7 +110,7 @@ class Decoder:
         #print("Norm of difference between V R and V_0 R_0",
         #      np.linalg.norm(self.V @ self.R - V_0 @ R_0))
 
-        return intrinsic_manifold_dim, dim
+        return dim
 
     def apply_perturb(self, selected_permutation, perturbation_type):
         if perturbation_type != 'WM' and perturbation_type != 'OM':

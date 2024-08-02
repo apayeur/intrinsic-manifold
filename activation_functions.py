@@ -6,7 +6,7 @@ def relu(x):
 
 
 def relu_prime(x):
-    return x > 0.
+    return 1. * (x > 0.)
 
 
 def relu_jac(x):

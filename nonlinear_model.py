@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import target_colors, units_convert
+from utils import target_colors, units_convert, build_data_container
 import activation_functions
 import copy
 import itertools
 from math import factorial
 from scipy.linalg import subspace_angles
 from scipy.optimize import fsolve
+from scipy.linalg import solve as scipy_solve
 from sklearn.linear_model import LinearRegression
 from decoder import Decoder
 plt.style.use('rnn4bci_plot_params.dms')
@@ -66,7 +67,9 @@ class NonlinearDeterministicNetwork:
         readouts_units = np.nonzero(np.diag(self.network_covariance()) > 1e-6)[0][:nb_readouts]
         nb_readouts = len(readouts_units)
         print("Number of readout units", nb_readouts)
-        V = 0.5 * self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** 0.5
+        #V = 0.5 * self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** 0.5  # DEBUG!!!!
+        V = 2*self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** exponent_W
+
         #initial_decoder_fac = 0.2
         #V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / nb_readouts) ** 0.5
         self.decoder = Decoder(readouts_units, self.network_size, V)
@@ -75,7 +78,7 @@ class NonlinearDeterministicNetwork:
         U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.nb_inputs))
         # U = self.rng.standard_normal(size=(self.network_size, self.nb_inputs)) / self.nb_inputs **
         W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
-        b = self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)
+        b = 0.*self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)  # DEBUG !!!
         return U, W, b
 
     # ============= For activity solver =============
@@ -114,6 +117,8 @@ class NonlinearDeterministicNetwork:
         else:
             Q = self.inv_I_minus_W()
             for k in range(self.nb_inputs):
+                #cps.append( np.linalg.solve(np.eye(self.network_size) - self.W, self.U@self.inputs[k]+self.b) )
+                #cps.append( scipy_solve(np.eye(self.network_size) - self.W, self.U@self.inputs[k]+self.b) )
                 cps.append(Q@(self.U@self.inputs[k]+self.b))
         return cps
 
@@ -130,6 +135,79 @@ class NonlinearDeterministicNetwork:
         for k in range(self.nb_inputs):
             ac += np.outer(cma[k] - self.mean_activity(), cma[k] - self.mean_activity())
         return ac / self.nb_inputs
+
+    def representation_similarity_matrix(self):
+        """Compute RSM based on mean activities"""
+        cas = np.array(self.conditioned_activities())
+        return cas @ cas.T
+
+    def neural_tangent_kernel(self):
+        """Technically, for a 2 output the NTK would be a tensor: K_{ab}(x_i, x_j),
+        where a,b = {x, y} and x_i, x_j are inputs. To simplify, we compute K_{xx}(x_i, x_j) + K_{yy}(x_i, x_j)."""
+        K = [np.zeros((self.nb_inputs, self.nb_inputs)), np.zeros((self.nb_inputs, self.nb_inputs)),
+             np.zeros((self.nb_inputs, self.nb_inputs)), np.zeros((self.nb_inputs, self.nb_inputs))]
+        du_xdW, du_ydW = [], []
+        cps = self.conditioned_potentials()
+
+        for v in cps:
+            M = np.linalg.inv(np.eye(self.network_size) - self.W @ self.phi_jac(v))
+            du_xdW.append(np.outer(self.phi(v), self.decoder.VR()[0, :] @ self.phi_jac(v)@M))
+            du_ydW.append(np.outer(self.phi(v), self.decoder.VR()[1, :] @ self.phi_jac(v)@M))
+
+        for i in range(self.nb_inputs):
+            for j in range(i, self.nb_inputs):
+                K[0][i, j] = np.trace(du_xdW[i] @ du_xdW[j].T)
+                K[1][i, j] = np.trace(du_xdW[i] @ du_ydW[j].T)
+                K[2][i, j] = np.trace(du_ydW[i] @ du_xdW[j].T)
+                K[3][i, j] = np.trace(du_ydW[i] @ du_ydW[j].T)
+
+        for i in range(self.nb_inputs):
+            for j in range(i):
+                K[0][i, j] = K[0][j, i]
+                K[1][i, j] = K[1][j, i]
+                K[2][i, j] = K[2][j, i]
+                K[3][i, j] = K[3][j, i]
+        return K
+
+    def neural_tangent_kernel_finite_diff(self):
+        """Compute an approximation of the NTK using finite differences."""
+        K = [np.zeros((self.nb_inputs, self.nb_inputs)), np.zeros((self.nb_inputs, self.nb_inputs)),
+             np.zeros((self.nb_inputs, self.nb_inputs)), np.zeros((self.nb_inputs, self.nb_inputs))]
+        du_xdW, du_ydW = ([np.zeros_like(self.W) for _ in range(self.nb_inputs)],
+                          [np.zeros_like(self.W) for _ in range(self.nb_inputs)])
+        W = copy.copy(self.W)
+        incr = 1e-3*np.min(W)
+
+        rates = self.conditioned_activities()
+        u_W = []
+        for k in range(self.nb_inputs):
+            u_W.append(self.decoder(rates[k]))
+
+        for i in range(self.network_size):
+            for j in range(self.network_size):
+                self.W = copy.copy(W)
+                self.W[i, j] += incr
+                rates = self.conditioned_activities()
+                for k in range(self.nb_inputs):
+                    u_W_plus_DeltaW = self.decoder(rates[k])
+                    du_xdW[k][i, j] = (u_W_plus_DeltaW[0] - u_W[k][0]) / incr
+                    du_ydW[k][i, j] = (u_W_plus_DeltaW[1] - u_W[k][1]) / incr
+
+        for i in range(self.nb_inputs):
+            for j in range(i, self.nb_inputs):
+                K[0][i, j] = np.sum(du_xdW[i] * du_xdW[j])
+                K[1][i, j] = np.sum(du_xdW[i] * du_ydW[j])
+                K[2][i, j] = np.sum(du_ydW[i] * du_xdW[j])
+                K[3][i, j] = np.sum(du_ydW[i] * du_ydW[j])
+
+        for i in range(self.nb_inputs):
+            for j in range(i):
+                K[0][i, j] = K[0][j, i]
+                K[1][i, j] = K[1][j, i]
+                K[2][i, j] = K[2][j, i]
+                K[3][i, j] = K[3][j, i]
+        return K
+
 
     # ==============  Loss ================
     def task_loss(self):
@@ -178,15 +256,7 @@ class NonlinearDeterministicNetwork:
 
     def train(self, lr=1.e-2, nb_iter=int(1e3), stopping_crit=None, do_record_data=True):
         if do_record_data:
-            data = {
-                'losses': {'task': [], 'corr': []},
-                'norm_gradW': [],
-                'max_angles': {'dVar_vs_VT': [], 'UpperVar_vs_VT': [], 'LowerVar_vs_VT': [], 'UpperVar_vs_VarBCI': []},
-                'min_angles': {'dVar_vs_VT': [], 'UpperVar_vs_VT': [], 'LowerVar_vs_VT': [], 'UpperVar_vs_VarBCI': []},
-                'normalized_variance_explained': [],
-                'A': {'D': [], 'DP_WM': []}, 'R': [], 'f': [], 'rel_proj_var_OM': [], 'pr': [], 'max_eigvals': [],
-                'tot_var': []
-            }
+            data = build_data_container()
         else:
             data = None
 
@@ -204,7 +274,7 @@ class NonlinearDeterministicNetwork:
         while i < int(nb_iter) or loss > stopping_crit:
             readout_var_prev = self.decoder.R @ self.network_covariance() @ self.decoder.R.T
             if do_record_data:
-                data['tot_var'].append(np.trace(readout_var_prev))
+                data['total_variance'].append(np.trace(readout_var_prev))
             loss = self.task_loss()
 
             potentials = self.conditioned_potentials()
@@ -213,9 +283,9 @@ class NonlinearDeterministicNetwork:
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", "EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
             if do_record_data:
-                data['losses']['task'].append(loss if max_ev < 1 else -1)
-                data['losses']['corr'].append(self.correlation_component_loss())
-                data['pr'].append(self.participation_ratio_(readout_var_prev))
+                data['loss'].append(loss if max_ev < 1 else -1)
+                data['loss_corr'].append(self.correlation_component_loss())
+                data['p_ratio'].append(self.participation_ratio_(readout_var_prev))
                 data['max_eigvals'].append(max_ev)
 
             if nb_iter == 0:
@@ -281,7 +351,6 @@ class NonlinearDeterministicNetwork:
         if om_select_method == 'original' and (nb_om_permuted_units > self.decoder.nb_readouts):
             raise ValueError(f"Number of requested OM permuted units, {nb_om_permuted_units}, "
                              f"should be smaller than number of readouts {self.decoder.nb_readouts}")
-
         nb_samples_wm = factorial(intrinsic_manifold_dim) if intrinsic_manifold_dim <= 8 else nb_samples
         nb_samples_om = max(nb_samples, nb_samples_wm) if om_select_method == 'original' else factorial(intrinsic_manifold_dim)
 

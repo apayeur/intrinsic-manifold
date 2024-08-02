@@ -1,23 +1,29 @@
 import numpy as np
+import copy
 import matplotlib.pyplot as plt
-target_colors = [(200./255, 0, 0),  # red
+
+target_colors = [(200. / 255, 0, 0),  # red
                  (0.9, 0.6, 0),  # orange
                  (0.95, 0.9, 0.25),  # yellow
-                 (0, 158./255, 115./255),  # bluish green
-                 (86./255, 180./255, 233./255),  # sky_blue
+                 (0, 158. / 255, 115. / 255),  # bluish green
+                 (86. / 255, 180. / 255, 233. / 255),  # sky_blue
                  (0, 0.45, 0.7),  # blue
                  (75. / 255, 0., 146. / 255),  # purple
                  (0.8, 0.6, 0.7)]  # pink
 col_o = (0, 0.45, 0.7)
-col_w = (200./255, 0, 0)
-perturbation_colors = {'WM': (200./255, 0, 0), 'OM': (0, 0.45, 0.7)}
+col_w = (200. / 255, 0, 0)
+perturbation_colors = {'WM': (200. / 255, 0, 0), 'OM': (0, 0.45, 0.7)}
 units_convert = {'cm': 1 / 2.54, 'mm': 1 / 2.54 / 10}
 
 
-class SVD:
-    def __init__(self, X):
-        self.X = X
-        self.U, self.S, self.VT = np.linalg.svd(X)
+def matrix_angle(M1, M2):
+    if isinstance(M1, np.ndarray) and isinstance(M2, np.ndarray):
+        return np.trace(M1.T @ M2) / np.linalg.norm(M1) / np.linalg.norm(M2)
+    elif isinstance(M1, list) and isinstance(M2, list):
+        s = []
+        for i in range(len(M1)):
+            s.append(np.trace(M1[i].T @ M2[i]) / np.linalg.norm(M1[i]) / np.linalg.norm(M2[i]))
+        return s
 
 
 def principal_angles(A, B):
@@ -42,7 +48,6 @@ def principal_angles(A, B):
     return np.arccos(c)
 
 
-
 def get_permutation_matrix(size, rng=np.random.default_rng()):
     indices = np.arange(size)
     rng.shuffle(indices)
@@ -57,12 +62,12 @@ def heap_permutation(k, arr):
     if k == 1:
         yield arr
     else:
-        heap_permutation(k-1, arr)
-        for i in range(k-1):
+        heap_permutation(k - 1, arr)
+        for i in range(k - 1):
             if k % 2 == 0:
-                arr[i], arr[k-1] = arr[k-1], arr[i]
+                arr[i], arr[k - 1] = arr[k - 1], arr[i]
             else:
-                arr[0], arr[k-1] = arr[k-1], arr[0]
+                arr[0], arr[k - 1] = arr[k - 1], arr[0]
             heap_permutation(k - 1, arr)
 
 
@@ -141,7 +146,7 @@ def plot_svd(singular_values, outfile_name):
     for ax in axes:
         ax.set_xlabel('Rank')
         ax.legend()
-    axes[0].set_xlim([1 - 0.1, N//5 + 0.1])
+    axes[0].set_xlim([1 - 0.1, N // 5 + 0.1])
     axes[1].set_xlim([1 - 0.5, N + 0.5])
     plt.tight_layout()
     plt.savefig(outfile_name)
@@ -177,4 +182,37 @@ def convert_uneven_lists_to_array(l):
         min_ = len(l[i]) if len(l[i]) < min_ else min_
     new_list = [l[i][:min_] for i in range(len(l))]
     return np.array(new_list)
+
+
+def build_data_container():
+    data_container = {'loss': [],  # loss during adaptation
+                      'loss_corr': [],  # correlation component of the loss
+                      'min_angles': {'dVar_vs_VT': [],
+                                     'UpperVar_vs_VT': [],
+                                     'LowerVar_vs_VT': [],
+                                     'UpperVar_vs_VarBCI': []},
+                      'max_angles': {'dVar_vs_VT': [],
+                                     'UpperVar_vs_VT': [],
+                                     'LowerVar_vs_VT': [],
+                                     'UpperVar_vs_VarBCI': []},
+                      'max_eigvals': [],
+                      'norm_gradW': [],
+                      'normalized_variance_explained': [],
+                      'R': [],  # ratio of projected variance (OM)
+                      'rel_proj_var_OM': [],  # tr(C_OM @ Var @ C_OM.T) / tr(C_OM @ Var_init @ C_OM.T)
+                      'f': [],  # tr(C @ Var @ C.T) / tr(Var)
+                      'A': {'D': [], 'DP_WM': []},  # amount of covariability projected along the row space of D
+                      'total_variance': [],
+                      'p_ratio': [],  # participation ratio
+                      'total_change_W_Fnorm': []
+                      }
+    return data_container
+
+def update_data_container(added, container):
+    for key in container:
+        if isinstance(container[key], dict):
+            for subkey in container[key]:
+                container[key][subkey].append(added[key][subkey])
+        else:
+            container[key].append(added[key])
 

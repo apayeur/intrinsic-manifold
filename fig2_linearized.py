@@ -2,7 +2,7 @@ from linearized_model import LinearizedModel
 import numpy as np
 import copy
 import os
-from scipy.linalg import subspace_angles
+
 
 def main():
     output_fig_format = 'png'
@@ -42,36 +42,24 @@ def main():
         if do_record_data:
             # Total losses
             loss_init = []
-            loss = {'WM': [],
-                    'OM': []}
+            loss = {'WM': [], 'OM': []}
             # Loss components
-            loss_corr = {'WM': [],
-                         'OM': []}
+            loss_corr = {'WM': [], 'OM': []}
 
             # Initial manifold dimension
             real_dims = np.empty(shape=(len(seeds, )))
 
             # Principal angles
-            min_angles = {'WM': {'dVar_vs_VT': [],
-                                 'UpperVar_vs_VT': [],
-                                 'LowerVar_vs_VT': [],
-                                 'UpperVar_vs_VarBCI': []},
-                          'OM': {'dVar_vs_VT': [],
-                                 'UpperVar_vs_VT': [],
-                                 'LowerVar_vs_VT': [],
-                                 'UpperVar_vs_VarBCI': []}
-                          }
+            min_angles = {'WM': {'dVar_vs_VT': [], 'UpperVar_vs_VT': [], 'LowerVar_vs_VT': [], 'UpperVar_vs_VarBCI': []},
+                          'OM': {'dVar_vs_VT': [], 'UpperVar_vs_VT': [], 'LowerVar_vs_VT': [], 'UpperVar_vs_VarBCI': []}}
             max_angles = copy.deepcopy(min_angles)
 
             # Norm of grad W
-            norm_gradW = {'loss': {'WM': [],
-                                   'OM': []},
-                          'loss_tot_var': {'WM': [],
-                                           'OM': []}}
+            norm_gradW = {'loss': {'WM': [], 'OM': []},
+                          'loss_tot_var': {'WM': [], 'OM': []}}
 
             # Normalized variance explained
-            normalized_variance_explained = {'WM': [],
-                                             'OM': []}
+            normalized_variance_explained = {'WM': [], 'OM': []}
 
             # Ratio of projected variance (OM)
             R = []
@@ -80,16 +68,13 @@ def main():
             rel_proj_var_OM = []
 
             # tr(C @ Var @ C.T) / tr(Var)
-            f = {'WM': [],
-                 'OM': []}
+            f = {'WM': [], 'OM': []}
 
             # Amount of covariability projected along the row space of D
-            A = {'D': [],
-                 'DP_WM': []}
+            A = {'D': [], 'DP_WM': []}
 
             # Total variance
-            tot_var = {'WM': [],
-                       'OM': []}
+            tot_var = {'WM': [], 'OM': []}
 
             # Candidate perturbation losses
             wm_total_losses, om_total_losses = None, None

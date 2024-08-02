@@ -1,17 +1,16 @@
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
 from utils import units_convert, col_o, col_w, convert_uneven_lists_to_array
 import os
 plt.style.use('rnn4bci_plot_params.dms')
 
-exponents_W = [0.55] #, 0.6, 0.7, 0.8, 0.9, 1]
+exponents_W = [1.] #, 0.6, 0.7, 0.8, 0.9, 1]
 diff_relative_loss = {exponent_W: [] for exponent_W in exponents_W}
 output_fig_format = 'png'
 load_dir_suffix = ""  # "-lr0.001-M6-iterAdapt500"
 
 for exponent_W in exponents_W:
-    tag = f"fig2-linearized-N100-linear-m5-zscoreTrue-zeroedavgxFalse-fitinterTrue-expW{exponent_W}"
+    tag = f"pretraining-N100-Nreadouts100-expW{exponent_W}"
     model_type = "egd"
     load_dir = f"data/{model_type}/{tag}"
     save_fig_dir = f"results/{model_type}/{tag}"
@@ -20,12 +19,13 @@ for exponent_W in exponents_W:
 
     params = np.load(f"{load_dir}/params.npy", allow_pickle=True).item()
 
-    loss_dict = np.load(f"{load_dir}/loss.npy", allow_pickle=True).item()
-    loss = loss_dict['loss']
-    loss_init = loss_dict['loss_init']
+    data = np.load(f"{load_dir}/data.npy", allow_pickle=True).item()
+
+    loss = {'WM': data['WM']['loss'], 'OM': data['OM']['loss']}
+    loss_init = data['pretraining']['loss']
     #loss_var = loss_dict['loss_var']
     #loss_exp = loss_dict['loss_exp']
-    loss_corr = loss_dict['loss_corr']
+    loss_corr = {'WM': data['WM']['loss_corr'], 'OM': data['OM']['loss_corr']}
     #loss_proj = loss_dict['loss_proj']
     #loss_vbar = loss_dict['loss_vbar']
 
@@ -68,10 +68,10 @@ for exponent_W in exponents_W:
     plt.tight_layout()
     plt.savefig(f'{save_fig_dir}/InitialLoss.{output_fig_format}')
     plt.close()
-
+    """
     # Plot adaptation loss for each seed
     nb_seed_with_nonmonotone_learning = {'WM': 0, 'OM': 0}
-    plt.figure(figsize=(45*units_convert['mm'], 45*units_convert['mm']/1.25))
+    plt.figure(figsize=(114/3*units_convert['mm'], 114/3*units_convert['mm']/1.15))
     for perturbation_type in ['WM', 'OM']:
         for i in range(loss[perturbation_type].shape[0]):
             perf = loss[perturbation_type][i] / loss[perturbation_type][i, 0]
@@ -127,7 +127,7 @@ for exponent_W in exponents_W:
     elif exponent_W == 1:
         plt.gca().text(0.5, 0.9, 'Rich', ha='center', va='center', transform=plt.gca().transAxes)
     if exponent_W == 0.55:
-         plt.xlim([0, 500])
+         plt.xlim([0, support_max])
          plt.xticks(plt.gca().get_xlim())
     else:
         plt.xlim([0, len(m)])
@@ -138,6 +138,7 @@ for exponent_W in exponents_W:
     outfile_name = f'{save_fig_dir}/LossAdapt.{output_fig_format}' if not plot_relative_loss else f'{save_fig_dir}/LossAdaptRelative.{output_fig_format}'
     plt.savefig(outfile_name)
     plt.close()
+    """
     """
     # Plot subsampled relative performance
     subsampling = nb_iter_adapt // nb_iter_adapt
