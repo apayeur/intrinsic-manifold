@@ -14,13 +14,13 @@ def main():
     size = (6, 100, 2)  # (input size, recurrent size, output size)
     nb_readouts = 100  # size[1]
 
-    seeds = np.arange(1, dtype=int)
+    seeds = np.arange(10, dtype=int)
     exponents_W = [1., 0.55]  # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'tanh'
 
     base_lr = 0.5 / size[1]
     lr_init = {0.55: base_lr, 1.: base_lr * nb_readouts}  # learning rate for initial training
-    lr = lr_init  # 0.1e-2                                  # learning rate during adaptation
+    lr = {0.55: 5*base_lr, 1.: 5*base_lr}  # 0.1e-2                                  # learning rate during adaptation
 
     stopping_crit = 1e-5
 
