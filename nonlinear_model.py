@@ -68,7 +68,10 @@ class NonlinearDeterministicNetwork:
         nb_readouts = len(readouts_units)
         print("Number of readout units", nb_readouts)
         #V = 0.5 * self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** 0.5  # DEBUG!!!!
-        V = 2*self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** exponent_W
+        if self.activation_function == 'linear':
+            V = self.rng.standard_normal(size=(2, nb_readouts)) / nb_readouts ** exponent_W
+        else:
+            V = 2*self.rng.standard_normal(size=(2, nb_readouts))  / nb_readouts ** exponent_W
 
         #initial_decoder_fac = 0.2
         #V *= (initial_decoder_fac / np.linalg.norm(V)) * (800 / nb_readouts) ** 0.5
@@ -77,8 +80,8 @@ class NonlinearDeterministicNetwork:
     def init_params(self, exponent_W):
         U = self.rng.uniform(low=-1, high=1, size=(self.network_size, self.nb_inputs))
         # U = self.rng.standard_normal(size=(self.network_size, self.nb_inputs)) / self.nb_inputs **
-        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** exponent_W
-        b = 0.*self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)  # DEBUG !!!
+        W = self.rng.standard_normal(size=(self.network_size, self.network_size)) / self.network_size ** 0.5 #exponent_W  DEBUG
+        b = self.rng.uniform(low=0, high=1, size=(self.network_size,)) if self.activation_function == 'relu' else np.zeros(self.network_size)  # DEBUG !!!
         return U, W, b
 
     # ============= For activity solver =============
@@ -251,7 +254,9 @@ class NonlinearDeterministicNetwork:
             grad = (self.decoder.V @ self.decoder.R @ self.inv_I_minus_W()).T @ partial_grad / self.nb_inputs
         # ng = np.linalg.norm(grad)
         # threshold = 1.
-        # grad = threshold*grad/ng if ng >= threshold else grad  # gradient clipping
+        # if ng > threshold:
+        #     grad = threshold*grad/ng  # gradient clipping
+        #     print("Gradient clipped...")
         return grad
 
     def train(self, lr=1.e-2, nb_iter=int(1e3), stopping_crit=None, do_record_data=True):
@@ -280,7 +285,7 @@ class NonlinearDeterministicNetwork:
             potentials = self.conditioned_potentials()
             max_ev = self.max_eigval(potentials)
             if max_ev >= 1:
-                print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", "EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!\n", f"Iter {i} EIGENVALUE GREATER THAN 1\n", "!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
             if do_record_data:
                 data['loss'].append(loss if max_ev < 1 else -1)

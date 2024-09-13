@@ -14,19 +14,19 @@ def main():
     size = (6, 100, 2)              # (input size, recurrent size, output size)
     nb_readouts = 100
     noise = 0.e-2
-    lr_init = 0.1 / size[1] #0.5 / size[1]
+    lr_init = 0.5 / size[1] #0.5 / size[1]
     seeds = np.arange(10, dtype=int)
     stopping_crit_pretraining = 1e-5
-    exponents_W = [0.55, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
-    lr = {0.55: lr_init, 1.: lr_init * nb_readouts}  # {0.55: lr_init, 1.: lr_init * nb_readouts}
-    activation_function = 'linear'
+    exponents_W = [0.5, 1.]        # W_0 ~ N(0, 1/N^exponent_W)
+    lr = {0.5: lr_init, 1.: lr_init * size[1]}
+    activation_function = 'tanh'
 
     do_record_data = True
     global_mean_input_is_zero = False
 
     for exponent_W in exponents_W:
         # Manage save and load folders
-        tag = (f"pretraining-N{size[1]}-Nreadouts{nb_readouts}-activation{activation_function}-V1-expW{exponent_W}")  # identification of this experiment
+        tag = (f"pretraining-largeinitWboth-N{size[1]}-Nreadouts{nb_readouts}-activation{activation_function}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
         if not os.path.exists(save_dir):
@@ -36,7 +36,7 @@ def main():
 
         # Data containers
         if do_record_data:
-            data = {'pretraining': build_data_container()}
+            data = {'initial': build_data_container()}
             representation_alignment = np.zeros(len(seeds))
             tangent_kernel_alignment = np.zeros((len(seeds), 4))
             delta_W_norm = np.zeros(len(seeds))
@@ -76,7 +76,7 @@ def main():
                 print("Tangent kernel alignment", tangent_kernel_alignment[seed_id])
                 print("Representational alignment", representation_alignment[seed_id])
                 print("Norm of weight change", delta_W_norm[seed_id])
-                update_data_container(data_pretraining, data['pretraining'])
+                update_data_container(data_pretraining, data['initial'])
 
         if do_record_data:
             param_dict = {'size': size,

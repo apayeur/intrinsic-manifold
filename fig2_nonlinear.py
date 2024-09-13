@@ -14,13 +14,13 @@ def main():
     size = (6, 100, 2)  # (input size, recurrent size, output size)
     nb_readouts = 100  # size[1]
 
-    seeds = np.arange(10, dtype=int)
-    exponents_W = [1., 0.55]  # W_0 ~ N(0, 1/N^exponent_W)
+    seeds = np.arange(5, dtype=int)
+    exponents_W = [1.]  # W_0 ~ N(0, 1/N^exponent_W)
     activation_function = 'tanh'
 
-    base_lr = 0.5 / size[1]
-    lr_init = {0.55: base_lr, 1.: base_lr * nb_readouts}  # learning rate for initial training
-    lr = {0.55: 5*base_lr, 1.: 5*base_lr}  # 0.1e-2                                  # learning rate during adaptation
+    base_lr = 0.2 / size[1]
+    lr_init = {0.5: base_lr, 1.: base_lr * nb_readouts}  # {0.55: base_lr, 1.: base_lr * nb_readouts} learning rate for initial training
+    lr = {0.5: base_lr, 1.: base_lr/5}                     # learning rate during adaptation
 
     stopping_crit = 1e-5
 
@@ -33,7 +33,7 @@ def main():
     for exponent_W in exponents_W:
         # Manage save and load folders
         tag = (
-            f"fig2-{activation_function}-dimthresh{95}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
+            f"fig2-largeinitWboth-{activation_function}-dimthresh{95}-zscore{do_z_score}-zeroedavgx{global_mean_input_is_zero}"
             f"-fitinter{fit_intercept}-expW{exponent_W}")  # identification of this experiment
         save_dir = f"data/egd/{tag}"
         save_dir_results = f"results/egd/{tag}"
@@ -45,7 +45,7 @@ def main():
         # Data containers
         manifold_dimension = np.empty(len(seeds), dtype=int)
         if do_record_data:
-            data = {'pretraining': build_data_container(),
+            data = {'initial': build_data_container(),
                     'WM': build_data_container(),
                     'OM': build_data_container()}
 
@@ -59,6 +59,12 @@ def main():
             delta_W_norm = {'initial': np.empty(len(seeds)),
                             'WM': np.empty(len(seeds)),
                             'OM': np.empty(len(seeds))}
+
+            # Others
+            output_matrix_norm = {'initial': np.empty(len(seeds)),
+                                  'fit': np.empty(len(seeds)),
+                                  'WM': np.empty(len(seeds)),
+                                  'OM': np.empty(len(seeds))}
 
 
         for seed_id, seed in enumerate(seeds):
@@ -76,7 +82,8 @@ def main():
             else:
                 raise ValueError("'activation_function' should be `linear`, `relu` or `tanh`")
 
-            print("norm of output matrix", np.linalg.norm(net0.decoder.VR()))
+            output_matrix_norm['initial'][seed_id] = np.linalg.norm(net0.decoder.VR())
+            print('output_matrix_norm = ', output_matrix_norm['initial'][seed_id])
 
             if do_record_data:
                 NTK_0 = net0.neural_tangent_kernel()
@@ -94,7 +101,7 @@ def main():
                 representation_alignment['initial'][seed_id] = matrix_angle(RSM, RSM_0)
                 tangent_kernel_alignment['initial'][seed_id] = matrix_angle(NTK, NTK_0)
                 delta_W_norm['initial'][seed_id] = np.linalg.norm(net0.W - W)
-                update_data_container(data_loc, data['pretraining'])
+                update_data_container(data_loc, data['initial'])
 
                 NTK_0 = copy.copy(NTK)
                 RSM_0 = copy.copy(RSM)
@@ -110,7 +117,8 @@ def main():
                                                            do_z_score=do_z_score)
 
             net1.plot_output(outfile_name=f"{save_dir_results}/SampleAfterDecoderFitting_seed{seed}.{output_fig_format}")
-            print("norm of output matrix", np.linalg.norm(net1.decoder.VR()))
+            output_matrix_norm['fit'][seed_id] = np.linalg.norm(net1.decoder.VR())
+            print('output_matrix_norm = ', output_matrix_norm['fit'][seed_id])
 
             '----------------------------------------- Retraining w/ decoder -----------------------------------------'
             net2 = copy.deepcopy(net1)
@@ -133,6 +141,9 @@ def main():
             net_wm = copy.deepcopy(net2)
             net_wm.decoder.apply_perturb(selected_perm['WM'], 'WM')  # apply WM perturbation
 
+            output_matrix_norm['WM'][seed_id] = np.linalg.norm(net_wm.decoder.VR())
+            print('output_matrix_norm = ', output_matrix_norm['WM'][seed_id])
+
             net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMBeforeLearning_seed{seed}.{output_fig_format}")
             data_loc = net_wm.train(lr=lr[exponent_W], stopping_crit=stopping_crit)
             net_wm.plot_output(outfile_name=f"{save_dir_results}/SampleWMAfterLearning_seed{seed}.{output_fig_format}")
@@ -151,6 +162,9 @@ def main():
             net_om = copy.deepcopy(net2)
             net_om.decoder.apply_perturb(selected_perm['OM'], 'OM')  # apply OM perturbation
 
+            output_matrix_norm['OM'][seed_id] = np.linalg.norm(net_om.decoder.VR())
+            print('output_matrix_norm = ', output_matrix_norm['OM'][seed_id])
+
             net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMBeforeLearning_seed{seed}.{output_fig_format}")
             data_loc = net_om.train(lr=lr[exponent_W], stopping_crit=stopping_crit)
             net_om.plot_output(outfile_name=f"{save_dir_results}/SampleOMAfterLearning_seed{seed}.{output_fig_format}")
@@ -168,7 +182,7 @@ def main():
             # Save parameters
             param_dict = {'size': size,
                           'nb_seeds': len(seeds),
-                          'lr_init': lr_init, 'lr_adapt': lr,
+                          'lr_init': lr_init[exponent_W], 'lr_adapt': lr[exponent_W],
                           'relearn_after_decoder_fitting': relearn_after_decoder_fitting}
             np.save(f"{save_dir}/params", param_dict)
 
@@ -176,6 +190,11 @@ def main():
             np.save(f"{save_dir}/representation_alignment", representation_alignment)
             np.save(f"{save_dir}/tangent_kernel_alignment", tangent_kernel_alignment)
             np.save(f"{save_dir}/delta_W_norm", delta_W_norm)
+
+            np.save(f"{save_dir}/manifold_dimension", manifold_dimension)
+            np.save(f"{save_dir}/output_matrix_norm", output_matrix_norm)
+
+
 
 if __name__ == '__main__':
     main()
